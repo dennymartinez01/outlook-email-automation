@@ -1,10 +1,10 @@
 from flask import Flask
 import threading
 import time
-import monitor_azure_version  # Your original script
+import monitor_azure_version
 
 app = Flask(__name__)
-app.invoice_thread_started = False  # Ensure thread runs only once
+app.invoice_thread_started = False
 
 def run_invoice_checker_loop():
     while True:
@@ -17,9 +17,9 @@ def run_invoice_checker_loop():
                 print("❌ Failed to get token")
         except Exception as e:
             print(f"❌ Error during invoice check: {e}")
-        time.sleep(180)  # Wait for 3 minutes
+        time.sleep(180)  # Run every 3 minutes
 
-@app.before_request
+@app.before_first_request
 def start_background_thread():
     if not app.invoice_thread_started:
         thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
