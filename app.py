@@ -1,11 +1,11 @@
-from flask import Flask, g
+from flask import Flask
 import threading
 import time
-import monitor_azure_version  # Your script
+import monitor_azure_version  # Your original script
 
 app = Flask(__name__)
+app.invoice_thread_started = False  # Ensure thread runs only once
 
-# Background thread function
 def run_invoice_checker_loop():
     while True:
         try:
@@ -14,21 +14,20 @@ def run_invoice_checker_loop():
             if token:
                 monitor_azure_version.check_emails(token)
             else:
-                print("❌ Failed to acquire token")
+                print("❌ Failed to get token")
         except Exception as e:
-            print(f"❌ Error in invoice checker: {e}")
-        time.sleep(180)  # Wait 3 minutes
+            print(f"❌ Error during invoice check: {e}")
+        time.sleep(180)  # Wait for 3 minutes
 
-# Start thread before serving (Flask 3+)
-@app.before_serving
-def start_background_task():
-    if not hasattr(g, "invoice_monitor_thread_started"):
+@app.before_request
+def start_background_thread():
+    if not app.invoice_thread_started:
         thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
         thread.start()
-        g.invoice_monitor_thread_started = True
+        app.invoice_thread_started = True
         print("✅ Background thread started")
 
-@app.route("/")
+@app.route('/')
 def home():
     return "📬 Invoice monitoring app is running every 3 minutes."
 
