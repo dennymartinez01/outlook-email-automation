@@ -17,16 +17,19 @@ def run_invoice_checker_loop():
                 print("❌ Failed to get token")
         except Exception as e:
             print(f"❌ Error during invoice check: {e}")
-        time.sleep(180)  # every 3 minutes
+        time.sleep(180)
 
-@app.before_serving
-async def start_background_thread():
+# ✅ Start thread at module level — not inside a Flask hook
+def start_background_thread():
     global invoice_thread_started
     if not invoice_thread_started:
         thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
         thread.start()
         invoice_thread_started = True
         print("✅ Background thread started")
+
+# ✅ Start thread once when app module is loaded
+start_background_thread()
 
 @app.route('/')
 def home():
