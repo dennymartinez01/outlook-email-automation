@@ -7,6 +7,7 @@ password = quote_plus("P@ssw0rd!!")  # IMPORTANT: URL encode special characters
 uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
 
 client = MongoClient(uri, tls=True)
+# client = MongoClient("mongodb://localhost:27017")
 
 try:
     dbs = client.list_database_names()
