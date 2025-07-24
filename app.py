@@ -41,7 +41,8 @@ def get_mongo_collection():
     password = quote_plus("P@ssw0rd!!")  # Use env var in real deployment
     host = "email-monitor-cluster-mongodb.mongo.cosmos.azure.com"
     port = 10255
-    uri = f"mongodb://{username}:{password}@{host}:{port}/?ssl=true&authMechanism=SCRAM-SHA-256&retrywrites=false"
+    # uri = f"mongodb://{username}:{password}@{host}:{port}/?ssl=true&authMechanism=SCRAM-SHA-256&retrywrites=false"
+    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
     client = MongoClient(uri, tls=True)
     db = client["email_invoice_db"]
     return db["invoicecollection"]
