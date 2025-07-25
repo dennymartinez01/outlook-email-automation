@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import threading
 import time
-import monitor_azure_version
+import monitor_azure_cosmosdb_cloud_version
 from pymongo import MongoClient
 from urllib.parse import quote_plus
 import csv
@@ -16,9 +16,9 @@ def run_invoice_checker_loop():
     while True:
         try:
             print("🔁 Running invoice check...")
-            token = monitor_azure_version.get_graph_token()
+            token = monitor_azure_cosmosdb_cloud_version.get_graph_token()
             if token:
-                monitor_azure_version.check_emails(token)
+                monitor_azure_cosmosdb_cloud_version.check_emails(token)
             else:
                 print("❌ Failed to get token")
         except Exception as e:
