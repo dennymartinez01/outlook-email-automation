@@ -74,13 +74,6 @@ def check_emails(token):
         print("❌ Error during email check:", e)
 
 # === Helpers ===
-def get_numeric_from_row(row_cells):
-    for cell in reversed(row_cells):
-        val = str(cell.get("content", "")).strip()
-        if re.match(r"^[\d.,]+$", val):
-            return val
-    return None
-
 def normalize_number(val):
     if not val:
         return None
@@ -113,9 +106,7 @@ def analyze_invoice(file_path):
     if result["status"] == "succeeded":
         doc = result["analyzeResult"]["documents"][0]
         fields = doc.get("fields", {})
-        extracted_data = {}
 
-        # Build structured Invoice header
         invoice_data = {
             "InvoiceNumber": fields.get("InvoiceId", {}).get("valueString") or fields.get("InvoiceNumber", {}).get("valueString"),
             "InvoiceDate": fields.get("InvoiceDate", {}).get("valueDate"),
@@ -135,27 +126,31 @@ def analyze_invoice(file_path):
             "AmountDue": fields.get("AmountDue", {}).get("valueNumber")
         }
 
-        # Fallbacks (regex + tables)
-        needed_keys = ["InvoiceTotal", "SubTotal", "TaxAmount", "AmountDue"]
+        # === Fallbacks ===
         full_text = result["analyzeResult"].get("content", "")
         if isinstance(full_text, list):
             full_text = " ".join([p.get("content", "") for p in full_text if isinstance(p, dict)])
 
         regex_patterns = {
-            "InvoiceTotal": r"(?:TOTAL\s*\(GBP\)|INVOICE\s*TOTAL|TOTAL)\s*[:\-]?\s*([\d.,]+)",
+            "InvoiceTotal": r"(?:TOTAL\s*\(.*?\)|INVOICE\s*TOTAL|TOTAL)\s*[:\-]?\s*([\d.,]+)",
             "SubTotal": r"(?:SUBTOTAL|SUB TOTAL)\s*[:\-]?\s*([\d.,]+)",
             "TaxAmount": r"(?:TAX\s*AMOUNT|VAT)\s*[:\-]?\s*([\d.,]+)",
             "AmountDue": r"(?:AMOUNT\s*DUE|BALANCE\s*DUE)\s*[:\-]?\s*([\d.,]+)",
+            "Currency": r"\b(USD|EUR|GBP|PHP|JPY)\b",
+            "DueDate": r"(?:DUE\s*DATE)\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})"
         }
 
         for key, pattern in regex_patterns.items():
             if not invoice_data.get(key):
                 matches = re.findall(pattern, full_text, re.IGNORECASE)
                 if matches:
-                    invoice_data[key] = normalize_number(matches[-1])
+                    val = matches[-1]
+                    if key in ["InvoiceTotal", "SubTotal", "TaxAmount", "AmountDue"]:
+                        val = normalize_number(val)
+                    invoice_data[key] = val
                     print(f"✅ Fallback {key} from text: {invoice_data[key]}")
 
-        # Extract Line Items
+        # === Extract Line Items ===
         line_items = []
         tables = result["analyzeResult"].get("tables", [])
         if isinstance(tables, list):
@@ -180,14 +175,13 @@ def analyze_invoice(file_path):
                             item.update({"Total": numeric_values[0]})
                         line_items.append(item)
 
-        # === Store to Cosmos DB (MongoDB API) with duplicate check ===
+        # === Store to Cosmos DB ===
         try:
             username = quote_plus("mongoadmin")
             password = quote_plus("P@ssw0rd!!")
             uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
 
             client = MongoClient(uri, tls=True)
-            # client = MongoClient("mongodb://localhost:27017")
             db = client["email_invoice_db"]
             collection = db["invoicecollection"]
 
