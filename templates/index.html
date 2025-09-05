@@ -44,11 +44,11 @@
         <tbody>
         {% for inv in invoices %}
             <tr>
-                <td>{{ inv.Invoice.InvoiceNumber or "N/A" }}</td>
-                <td>{{ inv.Invoice.InvoiceDate or "N/A" }}</td>
-                <td>{{ inv.Invoice.Supplier.Name or "N/A" }}</td>
-                <td>{{ inv.Invoice.Customer.Name or "N/A" }}</td>
-                <td>{{ inv.Invoice.InvoiceTotal or "N/A" }}</td>
+                <td>{{ inv.Invoice.get("InvoiceNumber", "N/A") }}</td>
+                <td>{{ inv.Invoice.get("InvoiceDate", "N/A") }}</td>
+                <td>{{ inv.Invoice.get("Supplier", {}).get("Name", "N/A") }}</td>
+                <td>{{ inv.Invoice.get("Customer", {}).get("Name", "N/A") }}</td>
+                <td>{{ inv.Invoice.get("InvoiceTotal", "N/A") }}</td>
                 <td>
                     <a href="/invoice/{{ inv._id }}" class="btn btn-sm btn-info">View</a>
                 </td>
