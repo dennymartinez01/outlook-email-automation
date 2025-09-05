@@ -11,6 +11,35 @@ client = MongoClient("mongodb://localhost:27017")
 db = client["email_invoice_db"]
 collection = db["invoicecollection"]
 
+@app.route("/invoices")
+def invoices_list():
+    vendor = request.args.get("vendor", "")
+    from_date = request.args.get("from_date", "")
+    to_date = request.args.get("to_date", "")
+    sort_field = request.args.get("sort", "InvoiceDate")
+    sort_order = request.args.get("order", "asc")
+    page = int(request.args.get("page", 1))
+
+    # TODO: implement filtering + sorting logic
+    invoices = list(collection.find({}).limit(20))
+
+    vendors = collection.distinct("VendorName")
+
+    return render_template(
+        "invoices_list.html",
+        invoices=invoices,
+        vendors=vendors,
+        vendor=vendor,
+        from_date=from_date,
+        to_date=to_date,
+        sort_field=sort_field,
+        sort_order=sort_order,
+        page=page,
+        start_page=1,
+        end_page=5,
+        total_pages=5
+    )
+
 @app.route('/')
 def index():
     query = {}

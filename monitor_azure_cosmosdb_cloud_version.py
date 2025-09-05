@@ -2,6 +2,7 @@ import msal
 import os
 import time
 import requests
+import re
 from base64 import b64decode
 from pymongo import MongoClient
 from urllib.parse import quote_plus
@@ -14,7 +15,7 @@ TARGET_USER_EMAIL = "docproject@roxorgroup.com"
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPE = ["https://graph.microsoft.com/.default"]
 
-# === Azure Form Recognizer Config ===
+# === Azure Document Intelligence Config ===
 AZURE_ENDPOINT = "https://email-invoice-ai.cognitiveservices.azure.com/"
 AZURE_KEY = "5jGo0u0vVCtR8YK1GdnRNoVIFKZDguEDm6W1KhQhXWJZQiqiIlrbJQQJ99BFACmepeSXJ3w3AAALACOG0Ta4"
 
@@ -41,35 +42,51 @@ def get_graph_token():
 
 # === Check Emails and Download Attachments ===
 def check_emails(token):
-    headers = {"Authorization": f"Bearer {token}"}
-    url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages?$top=10"
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages?$top=10"
 
-    res = requests.get(url, headers=headers)
-    print("Status Code:", res.status_code)
-    if res.status_code != 200:
-        print("Error:", res.text)
-        return
+        res = requests.get(url, headers=headers)
+        print("Status Code:", res.status_code)
+        if res.status_code != 200:
+            print("Error:", res.text)
+            return
 
-    emails = res.json().get("value", [])
-    for email in emails:
-        if email.get("hasAttachments", False):
-            att_url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages/{email['id']}/attachments"
-            att_res = requests.get(att_url, headers=headers)
-            attachments = att_res.json().get("value", [])
+        emails = res.json().get("value", [])
+        for email in emails:
+            if email.get("hasAttachments", False):
+                att_url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages/{email['id']}/attachments"
+                att_res = requests.get(att_url, headers=headers)
+                attachments = att_res.json().get("value", [])
 
-            for att in attachments:
-                if att.get("contentType") == "application/pdf":
-                    file_name = att.get("name", "invoice.pdf")
-                    file_data = b64decode(att["contentBytes"])
+                for att in attachments:
+                    if att.get("contentType") == "application/pdf":
+                        file_name = att.get("name", "invoice.pdf")
+                        file_data = b64decode(att["contentBytes"])
 
-                    full_path = os.path.join(SAVE_DIR, file_name)
-                    with open(full_path, "wb") as f:
-                        f.write(file_data)
-                    print(f"📄 Downloaded: {file_name}")
+                        full_path = os.path.join(SAVE_DIR, file_name)
+                        with open(full_path, "wb") as f:
+                            f.write(file_data)
+                        print(f"📄 Downloaded: {file_name}")
 
-                    analyze_invoice(full_path)
+                        analyze_invoice(full_path)
+    except Exception as e:
+        print("❌ Error during email check:", e)
 
-# === Analyze Invoice and Store in CosmosDB (Mongo API) ===
+# === Helpers ===
+def get_numeric_from_row(row_cells):
+    for cell in reversed(row_cells):
+        val = str(cell.get("content", "")).strip()
+        if re.match(r"^[\d.,]+$", val):
+            return val
+    return None
+
+def normalize_number(val):
+    if not val:
+        return None
+    return val.replace(",", "").replace(" ", "")
+
+# === Analyze Invoice and Store in CosmosDB ===
 def analyze_invoice(file_path):
     url = f"{AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31"
     headers = {
@@ -94,45 +111,104 @@ def analyze_invoice(file_path):
         time.sleep(2)
 
     if result["status"] == "succeeded":
-        fields = result["analyzeResult"]["documents"][0]["fields"]
+        doc = result["analyzeResult"]["documents"][0]
+        fields = doc.get("fields", {})
         extracted_data = {}
 
-        print("📊 Extracted Invoice Data:")
-        for key, val in fields.items():
-            value = (
-                val.get("valueNumber")
-                or val.get("valueString")
-                or val.get("valueDate")
-                or val.get("valueAddress")
-                or val.get("valuePhoneNumber")
-                or val.get("valueTime")
-                or val.get("valueInteger")
-                or val.get("value")
-            )
-            extracted_data[key] = value
-            confidence = val.get("confidence", 0)
-            print(f"{key}: {value} (confidence: {confidence})")
+        # Build structured Invoice header
+        invoice_data = {
+            "InvoiceNumber": fields.get("InvoiceId", {}).get("valueString") or fields.get("InvoiceNumber", {}).get("valueString"),
+            "InvoiceDate": fields.get("InvoiceDate", {}).get("valueDate"),
+            "DueDate": fields.get("DueDate", {}).get("valueDate"),
+            "Supplier": {
+                "Name": fields.get("VendorName", {}).get("valueString"),
+                "Address": fields.get("VendorAddress", {}).get("valueAddress")
+            },
+            "Customer": {
+                "Name": fields.get("CustomerName", {}).get("valueString"),
+                "Address": fields.get("CustomerAddress", {}).get("valueAddress")
+            },
+            "Currency": fields.get("Currency", {}).get("valueString"),
+            "SubTotal": fields.get("SubTotal", {}).get("valueNumber"),
+            "TaxAmount": fields.get("TaxAmount", {}).get("valueNumber"),
+            "InvoiceTotal": fields.get("InvoiceTotal", {}).get("valueNumber"),
+            "AmountDue": fields.get("AmountDue", {}).get("valueNumber")
+        }
 
-        # === Store to Cosmos DB for MongoDB ===
+        # Fallbacks (regex + tables)
+        needed_keys = ["InvoiceTotal", "SubTotal", "TaxAmount", "AmountDue"]
+        full_text = result["analyzeResult"].get("content", "")
+        if isinstance(full_text, list):
+            full_text = " ".join([p.get("content", "") for p in full_text if isinstance(p, dict)])
+
+        regex_patterns = {
+            "InvoiceTotal": r"(?:TOTAL\s*\(GBP\)|INVOICE\s*TOTAL|TOTAL)\s*[:\-]?\s*([\d.,]+)",
+            "SubTotal": r"(?:SUBTOTAL|SUB TOTAL)\s*[:\-]?\s*([\d.,]+)",
+            "TaxAmount": r"(?:TAX\s*AMOUNT|VAT)\s*[:\-]?\s*([\d.,]+)",
+            "AmountDue": r"(?:AMOUNT\s*DUE|BALANCE\s*DUE)\s*[:\-]?\s*([\d.,]+)",
+        }
+
+        for key, pattern in regex_patterns.items():
+            if not invoice_data.get(key):
+                matches = re.findall(pattern, full_text, re.IGNORECASE)
+                if matches:
+                    invoice_data[key] = normalize_number(matches[-1])
+                    print(f"✅ Fallback {key} from text: {invoice_data[key]}")
+
+        # Extract Line Items
+        line_items = []
+        tables = result["analyzeResult"].get("tables", [])
+        if isinstance(tables, list):
+            for t in tables:
+                rows = {}
+                for cell in t.get("cells", []):
+                    rows.setdefault(cell.get("rowIndex"), {})[cell.get("columnIndex")] = cell.get("content", "")
+
+                for row_idx, cols in rows.items():
+                    row_values = [cols[c] for c in sorted(cols.keys())]
+                    if not row_values or any(h in row_values[0].upper() for h in ["DESCRIPTION", "PRODUCT", "SERVICE", "NET", "TOTAL"]):
+                        continue
+
+                    numeric_values = [normalize_number(v) for v in row_values if re.match(r"^[\d.,]+$", v)]
+                    if numeric_values:
+                        item = {"Description": row_values[0]}
+                        if len(numeric_values) == 3:
+                            item.update({"Net": numeric_values[0], "VAT": numeric_values[1], "Total": numeric_values[2]})
+                        elif len(numeric_values) == 2:
+                            item.update({"Net": numeric_values[0], "Total": numeric_values[1]})
+                        elif len(numeric_values) == 1:
+                            item.update({"Total": numeric_values[0]})
+                        line_items.append(item)
+
+        # === Store to Cosmos DB (MongoDB API) with duplicate check ===
         try:
-            # Securely encode username and password
-            username = quote_plus("mongoadmin")
-            password = quote_plus("P@ssw0rd!!")  # IMPORTANT: URL encode special characters
-
-            uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
-
-            client = MongoClient(uri, tls=True)
+            # username = quote_plus("mongoadmin")
+            # password = quote_plus("P@ssw0rd!!")
+            # uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+            #
+            # client = MongoClient(uri, tls=True)
+            client = MongoClient("mongodb://localhost:27017")
             db = client["email_invoice_db"]
             collection = db["invoicecollection"]
 
-            document_id = os.path.basename(file_path) + f"-{int(time.time())}"
-            collection.insert_one({"_id": document_id, **extracted_data})
+            invoice_number = invoice_data.get("InvoiceNumber")
+            invoice_date = invoice_data.get("InvoiceDate")
+            document_id = f"{invoice_number}_{invoice_date}" if invoice_number and invoice_date else os.path.basename(file_path)
 
-            print("✅ Stored in Cosmos DB (MongoDB API)")
+            if collection.find_one({"_id": document_id}):
+                print(f"⚠️ Duplicate skipped: {document_id}")
+            else:
+                collection.insert_one({
+                    "_id": document_id,
+                    "Invoice": invoice_data,
+                    "LineItems": line_items
+                })
+                print(f"✅ Stored in Cosmos DB: {document_id}")
+
         except Exception as e:
             print("❌ Failed to store in MongoDB:", e)
 
-# === MAIN ENTRY POINT ===
+# === MAIN ===
 if __name__ == "__main__":
     token = get_graph_token()
     if token:

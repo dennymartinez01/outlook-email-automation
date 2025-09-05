@@ -39,6 +39,7 @@ start_background_thread()
 
 # ------------------ MONGO CONNECTION ------------------ #
 def get_mongo_collection():
+
     username = quote_plus("mongoadmin")
     password = quote_plus("P@ssw0rd!!")  # Use env var in real deployment
     host = "email-monitor-cluster-mongodb.mongo.cosmos.azure.com"
