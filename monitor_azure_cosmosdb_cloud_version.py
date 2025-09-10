@@ -11,7 +11,8 @@ from urllib.parse import quote_plus
 CLIENT_ID = "148cbb38-c335-4670-9a7f-26918ad4d293"
 TENANT_ID = "a0c1ede5-77c5-4669-af9d-7edf6858c52a"
 CLIENT_SECRET = "x-x8Q~SO9yY3OsNdnU7R4~~_pl-Pj.e36WTtAc3I"
-TARGET_USER_EMAIL = "docproject@roxorgroup.com"
+# TARGET_USER_EMAIL = "docproject@roxorgroup.com"
+TARGET_USER_EMAIL = "NonStockSupplierInvoices@roxorgroup.com"
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPE = ["https://graph.microsoft.com/.default"]
 
