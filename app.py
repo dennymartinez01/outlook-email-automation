@@ -209,6 +209,43 @@ def export_csv():
     output.seek(0)
     return send_file(output, mimetype="text/csv", as_attachment=True, download_name="invoices.csv")
 
+@app.route("/vendors")
+def list_records():
+    username = quote_plus("mongoadmin")
+    password = quote_plus("P@ssw0rd!!")
+    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+
+    client = MongoClient(uri, tls=True)
+    db = client["email_invoice_db"]
+    collection = db["vendorcollection"]
+
+    page = int(request.args.get("page", 1))
+    per_page = 10  # number of records per page
+
+    total_docs = collection.count_documents({})
+    total_pages = max(1, (total_docs + per_page - 1) // per_page)
+
+    cursor = collection.find() \
+        .skip((page - 1) * per_page) \
+        .limit(per_page)
+
+    records = list(cursor)
+    for r in records:
+        r["_id"] = str(r["_id"])
+
+    # show 5 pages window around current page
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, page + 2)
+
+    return render_template(
+        "vendors.html",
+        records=records,
+        page=page,
+        total_pages=total_pages,
+        start_page=start_page,
+        end_page=end_page
+    )
+
 # ------------------ MAIN ------------------ #
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vendors List</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #fafafa; }
+        h2 { margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .pagination { text-align: center; margin-top: 20px; }
+        .pagination a {
+            margin: 0 4px;
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            text-decoration: none;
+            color: #333;
+            border-radius: 4px;
+        }
+        .pagination a.active {
+            background-color: #007bff;
+            color: white;
+            border: 1px solid #007bff;
+        }
+        .pagination a:hover { background-color: #eee; }
+    </style>
+</head>
+<body>
+    <h2>📋 Vendors List</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Account Code</th>
+                <th>Company Code</th>
+                <th>Name</th>
+                <th>Street</th>
+                <th>City1</th>
+                <th>City2</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td>{{ record['Account Code'] }}</td>
+                <td>{{ record['Company Code'] }}</td>
+                <td>{{ record['Name'] }}</td>
+                <td>{{ record['Street'] }}</td>
+                <td>{{ record['City1'] }}</td>
+                <td>{{ record['City2'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination Controls -->
+    <div class="pagination">
+        {% if page > 1 %}
+            <a href="{{ url_for('list_records', page=page-1) }}">Previous</a>
+        {% endif %}
+
+        {% for p in range(start_page, end_page+1) %}
+            <a href="{{ url_for('list_records', page=p) }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+        {% endfor %}
+
+        {% if page < total_pages %}
+            <a href="{{ url_for('list_records', page=page+1) }}">Next</a>
+        {% endif %}
+    </div>
+</body>
+</html>
