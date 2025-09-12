@@ -3,10 +3,6 @@ from pymongo import MongoClient, ASCENDING
 from urllib.parse import quote_plus
 
 # --- MongoDB connection ---
-# client = MongoClient("mongodb://localhost:27017/")  # change if needed
-# db = client["mydatabase"]       # database name
-# collection = db["mycollection"] # collection name
-
 username = quote_plus("mongoadmin")
 password = quote_plus("P@ssw0rd!!")
 uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
@@ -15,9 +11,12 @@ client = MongoClient(uri, tls=True)
 db = client["email_invoice_db"]
 collection = db["vendorcollection"]
 
-# --- STEP 1: Deduplicate existing records ---
+# --- STEP 1: Remove duplicates ---
 print("🔍 Checking for duplicates...")
+
 pipeline = [
+    # Ignore docs where either key field is null
+    {"$match": {"Account Code": {"$ne": None}, "Company Code": {"$ne": None}}},
     {
         "$group": {
             "_id": {"Account Code": "$Account Code", "Company Code": "$Company Code"},
@@ -40,7 +39,14 @@ for group in duplicates:
 
 print(f"🗑️ Removed {deleted_count} duplicate documents.")
 
-# --- STEP 2: Create unique compound index ---
+# --- STEP 2: Drop old conflicting index ---
+print("🧹 Checking for old indexes...")
+for idx_name in collection.index_information().keys():
+    if "code_company_unique" in idx_name:   # old index name
+        print(f"🗑️ Dropping old index: {idx_name}")
+        collection.drop_index(idx_name)
+
+# --- STEP 3: Create clean unique compound index ---
 print("📌 Creating unique index on (Account Code, Company Code)...")
 collection.create_index(
     [("Account Code", ASCENDING), ("Company Code", ASCENDING)],
@@ -49,11 +55,11 @@ collection.create_index(
 )
 print("✅ Unique index created successfully.")
 
-# --- STEP 3: Read Excel file ---
+# --- STEP 4: Read Excel file ---
 file_path = "downloads/vendor.xlsx"  # replace with your Excel file path
 df = pd.read_excel(file_path)
 
-# --- STEP 4: Insert/Update into MongoDB ---
+# --- STEP 5: Insert/Update into MongoDB ---
 data = df.to_dict(orient="records")
 for record in data:
     filter_query = {

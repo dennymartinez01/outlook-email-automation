@@ -246,6 +246,43 @@ def list_records():
         end_page=end_page
     )
 
+@app.route("/companies")
+def list_companies():
+    username = quote_plus("mongoadmin")
+    password = quote_plus("P@ssw0rd!!")
+    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+
+    client = MongoClient(uri, tls=True)
+    db = client["email_invoice_db"]
+    collection = db["companycollection"]
+    page = int(request.args.get("page", 1))
+    per_page = 10
+
+    # Count total documents
+    total_docs = collection.count_documents({})
+    total_pages = max(1, (total_docs + per_page - 1) // per_page)
+
+    # Paginated query
+    cursor = collection.find().skip((page - 1) * per_page).limit(per_page)
+    companies = list(cursor)
+
+    # Convert ObjectId to string
+    for c in companies:
+        c["_id"] = str(c["_id"])
+
+    # Pagination range (show 5 numbers max)
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, page + 2)
+
+    return render_template(
+        "companies.html",
+        companies=companies,
+        page=page,
+        total_pages=total_pages,
+        start_page=start_page,
+        end_page=end_page
+    )
+
 # ------------------ MAIN ------------------ #
 if __name__ == "__main__":
     app.run(debug=True)
