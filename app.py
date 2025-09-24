@@ -343,6 +343,9 @@ def invoices_v2():
 
     invoices = []
     for inv in cursor:
+        line_items = inv.get("LineItems", [])
+        category = "Stock" if line_items and len(line_items) > 0 else "Non-stock"
+
         invoices.append({
             "_id": str(inv.get("_id")),
             "invoice_no": inv.get("Invoice", {}).get("InvoiceNumber", ""),
@@ -350,7 +353,7 @@ def invoices_v2():
             "vendor": inv.get("Invoice", {}).get("Supplier", {}).get("Name", ""),
             "customer": inv.get("Invoice", {}).get("Customer", {}).get("Name", ""),
             "total": inv.get("Invoice", {}).get("InvoiceTotal", 0),
-            "category": "Non-stock",
+            "category": category,
             "status": "Exported",
             "pdf_file": inv.get("pdf_file", "")
         })
