@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, send_file
+import os
+from flask import Flask, render_template, request, send_file, send_from_directory, jsonify
 import threading
 import time
 from bson.objectid import ObjectId
@@ -7,7 +8,7 @@ from urllib.parse import quote_plus
 import csv
 import io
 import datetime
-
+import shutil
 import monitor_azure_cosmosdb_cloud_version
 
 app = Flask(__name__)
@@ -39,6 +40,7 @@ start_background_thread()
 
 # ------------------ MONGO CONNECTION ------------------ #
 def get_mongo_collection():
+    # client = MongoClient("mongodb://localhost:27017/")  # change if needed
     username = quote_plus("mongoadmin")
     password = quote_plus("P@ssw0rd!!")  # Use env var in real deployment
     uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
@@ -148,6 +150,24 @@ def invoices_list():
         end_page=end_page
     )
 
+@app.route("/api/invoice/<doc_id>")
+def invoice_detail_json(doc_id):
+    collection = get_mongo_collection()
+    try:
+        if ObjectId.is_valid(doc_id):
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+        else:
+            doc = collection.find_one({"_id": doc_id})
+    except Exception as e:
+        print("❌ Error fetching invoice:", e)
+        return jsonify({"error": "Error fetching invoice"}), 500
+
+    if not doc:
+        return jsonify({"error": "Invoice not found"}), 404
+
+    doc["_id"] = str(doc["_id"])
+    return jsonify(doc)
+
 @app.route("/invoice/<doc_id>")
 def invoice_detail(doc_id):
     collection = get_mongo_collection()
@@ -211,6 +231,7 @@ def export_csv():
 
 @app.route("/vendors")
 def list_records():
+    # client = MongoClient("mongodb://localhost:27017/")  # change if needed
     username = quote_plus("mongoadmin")
     password = quote_plus("P@ssw0rd!!")
     uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
@@ -248,6 +269,7 @@ def list_records():
 
 @app.route("/companies")
 def list_companies():
+    # client = MongoClient("mongodb://localhost:27017/")  # change if needed
     username = quote_plus("mongoadmin")
     password = quote_plus("P@ssw0rd!!")
     uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
@@ -282,6 +304,100 @@ def list_companies():
         start_page=start_page,
         end_page=end_page
     )
+
+@app.route("/v2/invoices")
+def invoices_v2():
+    # client = MongoClient("mongodb://localhost:27017/")
+    username = quote_plus("mongoadmin")
+    password = quote_plus("P@ssw0rd!!")
+    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+
+    client = MongoClient(uri, tls=True)
+    db = client["email_invoice_db"]
+    collection = db["invoicecollection"]
+
+    # --- Advanced Search ---
+    search_query = request.args.get("vendor", "").strip()
+    mongo_query = {}
+
+    if search_query:
+        regex = {"$regex": search_query, "$options": "i"}  # case-insensitive substring
+        mongo_query["$or"] = [
+            {"Invoice.InvoiceNumber": regex},
+            {"Invoice.Supplier.Name": regex},
+            {"Invoice.Customer.Name": regex},
+        ]
+
+    # --- Pagination ---
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    total_docs = collection.count_documents(mongo_query)
+    total_pages = max(1, (total_docs + per_page - 1) // per_page)
+
+    cursor = (
+        collection.find(mongo_query)
+        .sort("Invoice.InvoiceDate", -1)
+        .skip((page - 1) * per_page)
+        .limit(per_page)
+    )
+
+    invoices = []
+    for inv in cursor:
+        invoices.append({
+            "_id": str(inv.get("_id")),
+            "invoice_no": inv.get("Invoice", {}).get("InvoiceNumber", ""),
+            "date": inv.get("Invoice", {}).get("InvoiceDate", ""),
+            "vendor": inv.get("Invoice", {}).get("Supplier", {}).get("Name", ""),
+            "customer": inv.get("Invoice", {}).get("Customer", {}).get("Name", ""),
+            "total": inv.get("Invoice", {}).get("InvoiceTotal", 0),
+            "category": "Non-stock",
+            "status": "Exported",
+            "pdf_file": inv.get("pdf_file", "")
+        })
+
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, page + 2)
+
+    return render_template(
+        "roxor_template_2.html",
+        invoices=invoices,
+        vendor=search_query,
+        page=page,
+        total_pages=total_pages,
+        start_page=start_page,
+        end_page=end_page
+    )
+
+
+@app.route("/pdf/<path:filename>")
+def serve_pdf(filename):
+    pdf_dir = os.path.join(os.getcwd(), "downloads")  # folder where PDFs are saved
+    return send_from_directory(pdf_dir, filename)
+
+@app.route("/purge", methods=["POST"])
+def purge_invoices():
+    try:
+        # 1. Delete all documents in MongoDB
+        collection = get_mongo_collection()
+        collection.delete_many({})
+        print("✅ All invoices deleted from MongoDB")
+
+        # 2. Delete all files inside Downloads folder
+        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        if os.path.exists(downloads_dir):
+            for filename in os.listdir(downloads_dir):
+                file_path = os.path.join(downloads_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"⚠️ Could not delete {file_path}: {e}")
+
+        return jsonify({"success": True, "message": "All invoices and PDFs purged successfully."})
+    except Exception as e:
+        print(f"❌ Purge failed: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # ------------------ MAIN ------------------ #
 if __name__ == "__main__":

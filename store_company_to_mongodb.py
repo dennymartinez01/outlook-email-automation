@@ -3,15 +3,15 @@ from pymongo import MongoClient, ASCENDING
 from urllib.parse import quote_plus
 
 # --- MongoDB connection ---
-# client = MongoClient("mongodb://localhost:27017/")  # change if needed
+client = MongoClient("mongodb://localhost:27017/")  # change if needed
 # db = client["mydatabase"]       # database name
 # collection = db["mycollection"] # collection name
 
-username = quote_plus("mongoadmin")
-password = quote_plus("P@ssw0rd!!")
-uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+# username = quote_plus("mongoadmin")
+# password = quote_plus("P@ssw0rd!!")
+# uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
 
-client = MongoClient(uri, tls=True)
+# client = MongoClient(uri, tls=True)
 db = client["email_invoice_db"]
 collection = db["companycollection"]
 

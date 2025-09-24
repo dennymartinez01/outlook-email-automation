@@ -178,6 +178,7 @@ def analyze_invoice(file_path):
 
         # === Store to Cosmos DB ===
         try:
+            # client = MongoClient("mongodb://localhost:27017/")  # change if needed
             username = quote_plus("mongoadmin")
             password = quote_plus("P@ssw0rd!!")
             uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
@@ -196,7 +197,8 @@ def analyze_invoice(file_path):
                 collection.insert_one({
                     "_id": document_id,
                     "Invoice": invoice_data,
-                    "LineItems": line_items
+                    "LineItems": line_items,
+                    "pdf_file": os.path.basename(file_path)  # 👈 store PDF filename
                 })
                 print(f"✅ Stored in Cosmos DB: {document_id}")
 
