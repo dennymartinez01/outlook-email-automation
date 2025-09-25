@@ -6,6 +6,7 @@ import re
 from base64 import b64decode
 from pymongo import MongoClient
 from urllib.parse import quote_plus
+from azure.storage.blob import BlobServiceClient
 
 # === Microsoft Graph Auth Config ===
 CLIENT_ID = "148cbb38-c335-4670-9a7f-26918ad4d293"
@@ -23,6 +24,40 @@ AZURE_KEY = "5jGo0u0vVCtR8YK1GdnRNoVIFKZDguEDm6W1KhQhXWJZQiqiIlrbJQQJ99BFACmepeS
 # === Local Download Folder ===
 SAVE_DIR = "downloads"
 os.makedirs(SAVE_DIR, exist_ok=True)
+
+# === saves to local Downloads/
+# USE_BLOB_STORAGE=0
+
+# === saves to Blob Storage
+# AZURE_STORAGE_CONNECTION_STRING=
+
+# === Storage Toggle (decide where PDFs go) ===
+# USE_BLOB = os.environ.get("USE_BLOB_STORAGE", "0") == "1"
+
+# === CONNECTION STRING
+# DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;EndpointSuffix=core.windows.net
+
+USE_BLOB = 1
+
+if USE_BLOB:
+    AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;EndpointSuffix=core.windows.net"
+    blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+    container = blob_service.get_container_client("invoices")
+
+def save_attachment(filename: str, content_bytes: bytes) -> str:
+    """Save attachment either to Azure Blob Storage or local Downloads folder."""
+    if USE_BLOB:
+        blob_client = container.get_blob_client(filename)
+        blob_client.upload_blob(content_bytes, overwrite=True)
+        url = blob_client.url
+        print(f"✅ Uploaded to Blob: {url}")
+        return url  # return blob URL
+    else:
+        full_path = os.path.join(SAVE_DIR, filename)
+        with open(full_path, "wb") as f:
+            f.write(content_bytes)
+        print(f"💾 Saved locally: {full_path}")
+        return os.path.basename(full_path)  # store filename only
 
 # === Authenticate with MS Graph ===
 def get_graph_token():
@@ -65,12 +100,11 @@ def check_emails(token):
                         file_name = att.get("name", "invoice.pdf")
                         file_data = b64decode(att["contentBytes"])
 
-                        full_path = os.path.join(SAVE_DIR, file_name)
-                        with open(full_path, "wb") as f:
-                            f.write(file_data)
-                        print(f"📄 Downloaded: {file_name}")
+                        # Save either to Blob or local
+                        pdf_ref = save_attachment(file_name, file_data)
 
-                        analyze_invoice(full_path)
+                        # Pass the reference (path or URL) + file content to analyzer
+                        analyze_invoice(pdf_ref, file_data)
     except Exception as e:
         print("❌ Error during email check:", e)
 
@@ -81,17 +115,14 @@ def normalize_number(val):
     return val.replace(",", "").replace(" ", "")
 
 # === Analyze Invoice and Store in CosmosDB ===
-def analyze_invoice(file_path):
+def analyze_invoice(pdf_ref, content_bytes):
     url = f"{AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31"
     headers = {
         "Content-Type": "application/pdf",
         "Ocp-Apim-Subscription-Key": AZURE_KEY
     }
 
-    with open(file_path, "rb") as f:
-        data = f.read()
-
-    res = requests.post(url, headers=headers, data=data)
+    res = requests.post(url, headers=headers, data=content_bytes)
     if res.status_code != 202:
         print("❌ Failed to submit document:", res.text)
         return
@@ -159,12 +190,10 @@ def analyze_invoice(file_path):
                 rows = {}
                 for cell in t.get("cells", []):
                     rows.setdefault(cell.get("rowIndex"), {})[cell.get("columnIndex")] = cell.get("content", "")
-
                 for row_idx, cols in rows.items():
                     row_values = [cols[c] for c in sorted(cols.keys())]
                     if not row_values or any(h in row_values[0].upper() for h in ["DESCRIPTION", "PRODUCT", "SERVICE", "NET", "TOTAL"]):
                         continue
-
                     numeric_values = [normalize_number(v) for v in row_values if re.match(r"^[\d.,]+$", v)]
                     if numeric_values:
                         item = {"Description": row_values[0]}
@@ -189,7 +218,7 @@ def analyze_invoice(file_path):
 
             invoice_number = invoice_data.get("InvoiceNumber")
             invoice_date = invoice_data.get("InvoiceDate")
-            document_id = f"{invoice_number}_{invoice_date}" if invoice_number and invoice_date else os.path.basename(file_path)
+            document_id = f"{invoice_number}_{invoice_date}" if invoice_number and invoice_date else pdf_ref
 
             if collection.find_one({"_id": document_id}):
                 print(f"⚠️ Duplicate skipped: {document_id}")
@@ -198,7 +227,7 @@ def analyze_invoice(file_path):
                     "_id": document_id,
                     "Invoice": invoice_data,
                     "LineItems": line_items,
-                    "pdf_file": os.path.basename(file_path)  # 👈 store PDF filename
+                    "pdf_file": pdf_ref  # 👈 store either Blob URL or local filename
                 })
                 print(f"✅ Stored in Cosmos DB: {document_id}")
 

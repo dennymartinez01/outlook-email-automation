@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, send_file, send_from_directory, jsonify
+from flask import Flask, render_template, request, send_file, send_from_directory, jsonify, redirect
 import threading
 import time
 from bson.objectid import ObjectId
@@ -374,32 +374,111 @@ def invoices_v2():
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
-    pdf_dir = os.path.join(os.getcwd(), "downloads")  # folder where PDFs are saved
-    return send_from_directory(pdf_dir, filename)
+    USE_BLOB = 1
+
+    try:
+        # Case 1: If stored as a full Blob URL (starts with http)
+        if filename.startswith("http"):
+            return redirect(filename)  # just redirect browser to blob public URL
+
+        if USE_BLOB:
+            # === Serve file directly from Azure Blob Storage ===
+            from azure.storage.blob import BlobServiceClient
+            AZURE_STORAGE_CONNECTION_STRING = (
+                "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;"
+                "AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;"
+                "EndpointSuffix=core.windows.net"
+            )
+            blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+            container = blob_service.get_container_client("invoices")
+            blob_client = container.get_blob_client(filename)
+
+            stream = blob_client.download_blob()
+            pdf_bytes = stream.readall()
+
+            return send_file(
+                io.BytesIO(pdf_bytes),
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=filename
+            )
+        else:
+            # === Serve file from local downloads/ folder ===
+            pdf_dir = os.path.join(os.getcwd(), "downloads")
+            return send_from_directory(pdf_dir, filename)
+
+    except Exception as e:
+        print(f"❌ Error serving PDF {filename}: {e}")
+        return f"Error serving PDF: {e}", 500
+
 
 @app.route("/purge", methods=["POST"])
 def purge_invoices():
     try:
         # 1. Delete all documents in MongoDB
         collection = get_mongo_collection()
+
+        # 👇 Fetch pdf_file references before deleting docs
+        all_invoices = list(collection.find({}, {"pdf_file": 1}))
         collection.delete_many({})
         print("✅ All invoices deleted from MongoDB")
 
-        # 2. Delete all files inside Downloads folder
-        downloads_dir = os.path.join(os.getcwd(), "downloads")
-        if os.path.exists(downloads_dir):
-            for filename in os.listdir(downloads_dir):
-                file_path = os.path.join(downloads_dir, filename)
+        # 2. Delete all files (either local or Blob)
+        USE_BLOB = 1
+
+        if USE_BLOB:
+            # === Delete from Azure Blob Storage ===
+            from azure.storage.blob import BlobServiceClient
+            AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;EndpointSuffix=core.windows.net"
+            blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+            container = blob_service.get_container_client("invoices")
+
+            # 👇 Delete only blobs linked in MongoDB (not blindly all)
+            for inv in all_invoices:
+                pdf_ref = inv.get("pdf_file")
+                if not pdf_ref:
+                    continue
                 try:
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
+                    if pdf_ref.startswith("http"):
+                        # Example: https://roxorinvoicefiles.blob.core.windows.net/invoices/invoice123.pdf
+                        blob_name = pdf_ref.split("/")[-1]
+                    else:
+                        blob_name = pdf_ref
+
+                    container.delete_blob(blob_name)
+                    print(f"🗑️ Deleted from Blob: {blob_name}")
                 except Exception as e:
-                    print(f"⚠️ Could not delete {file_path}: {e}")
+                    print(f"⚠️ Could not delete blob {pdf_ref}: {e}")
+
+            # 👇 Old method: delete all blobs (kept for reference, now skipped)
+            # blobs = container.list_blobs()
+            # for blob in blobs:
+            #     try:
+            #         container.delete_blob(blob.name)
+            #         print(f"🗑️ Deleted from Blob: {blob.name}")
+            #     except Exception as e:
+            #         print(f"⚠️ Could not delete blob {blob.name}: {e}")
+
+        else:
+            # === Delete local files in downloads/ ===
+            downloads_dir = os.path.join(os.getcwd(), "downloads")
+            if os.path.exists(downloads_dir):
+                for filename in os.listdir(downloads_dir):
+                    file_path = os.path.join(downloads_dir, filename)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            print(f"🗑️ Deleted local file: {file_path}")
+                    except Exception as e:
+                        print(f"⚠️ Could not delete {file_path}: {e}")
 
         return jsonify({"success": True, "message": "All invoices and PDFs purged successfully."})
+
     except Exception as e:
         print(f"❌ Purge failed: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
+
 
 
 # ------------------ MAIN ------------------ #
