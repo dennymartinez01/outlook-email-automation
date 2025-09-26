@@ -6,7 +6,7 @@ import re
 from base64 import b64decode
 from pymongo import MongoClient
 from urllib.parse import quote_plus
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, ContentSettings  # 👈 added ContentSettings
 
 # === Microsoft Graph Auth Config ===
 CLIENT_ID = "148cbb38-c335-4670-9a7f-26918ad4d293"
@@ -48,7 +48,14 @@ def save_attachment(filename: str, content_bytes: bytes) -> str:
     """Save attachment either to Azure Blob Storage or local Downloads folder."""
     if USE_BLOB:
         blob_client = container.get_blob_client(filename)
-        blob_client.upload_blob(content_bytes, overwrite=True)
+        blob_client.upload_blob(
+            content_bytes,
+            overwrite=True,
+            content_settings=ContentSettings(   # 👈 ensures browser renders PDF
+                content_type="application/pdf",
+                content_disposition="inline"
+            )
+        )
         url = blob_client.url
         print(f"✅ Uploaded to Blob: {url}")
         return url  # return blob URL
