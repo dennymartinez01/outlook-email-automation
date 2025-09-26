@@ -373,17 +373,20 @@ def invoices_v2():
 
 
 @app.route("/pdf/<path:filename>")
+@app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     USE_BLOB = 1
     try:
         if filename.startswith("http"):
-            # Instead of redirect, fetch & stream
             import requests
             r = requests.get(filename)
             return Response(
                 r.content,
                 mimetype="application/pdf",
-                headers={"Content-Disposition": "inline; filename=%s" % filename}
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Content-Type": "application/pdf"
+                }
             )
 
         if USE_BLOB:
@@ -402,7 +405,10 @@ def serve_pdf(filename):
             return Response(
                 pdf_bytes,
                 mimetype="application/pdf",
-                headers={"Content-Disposition": "inline; filename=%s" % filename}
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Content-Type": "application/pdf"
+                }
             )
         else:
             pdf_dir = os.path.join(os.getcwd(), "downloads")
@@ -416,7 +422,6 @@ def serve_pdf(filename):
     except Exception as e:
         print(f"❌ Error serving PDF {filename}: {e}")
         return f"Error serving PDF: {e}", 500
-
 
 
 @app.route("/purge", methods=["POST"])
