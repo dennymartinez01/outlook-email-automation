@@ -375,11 +375,10 @@ def invoices_v2():
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     USE_BLOB = 1
-
     try:
         # Case 1: If stored as a full Blob URL (starts with http)
         if filename.startswith("http"):
-            return redirect(filename)  # just redirect browser to blob public URL
+            return redirect(filename)
 
         if USE_BLOB:
             # === Serve file directly from Azure Blob Storage ===
@@ -396,20 +395,30 @@ def serve_pdf(filename):
             stream = blob_client.download_blob()
             pdf_bytes = stream.readall()
 
-            return send_file(
-                io.BytesIO(pdf_bytes),
+            # ✅ Force inline display
+            from flask import Response
+            return Response(
+                pdf_bytes,
                 mimetype="application/pdf",
-                as_attachment=False,
-                download_name=filename
+                headers={
+                    "Content-Disposition": f"inline; filename={filename}"
+                }
             )
+
         else:
             # === Serve file from local downloads/ folder ===
             pdf_dir = os.path.join(os.getcwd(), "downloads")
-            return send_from_directory(pdf_dir, filename)
+            return send_from_directory(
+                pdf_dir,
+                filename,
+                mimetype="application/pdf",
+                as_attachment=False
+            )
 
     except Exception as e:
         print(f"❌ Error serving PDF {filename}: {e}")
         return f"Error serving PDF: {e}", 500
+
 
 
 @app.route("/purge", methods=["POST"])
