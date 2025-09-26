@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, send_file, send_from_directory, jsonify, redirect
+from flask import Flask, render_template, request, send_file, send_from_directory, jsonify, redirect, Response
 import threading
 import time
 from bson.objectid import ObjectId
@@ -376,17 +376,21 @@ def invoices_v2():
 def serve_pdf(filename):
     USE_BLOB = 1
     try:
-        # Case 1: If stored as a full Blob URL (starts with http)
         if filename.startswith("http"):
-            return redirect(filename)
+            # Instead of redirect, fetch & stream
+            import requests
+            r = requests.get(filename)
+            return Response(
+                r.content,
+                mimetype="application/pdf",
+                headers={"Content-Disposition": "inline; filename=%s" % filename}
+            )
 
         if USE_BLOB:
-            # === Serve file directly from Azure Blob Storage ===
             from azure.storage.blob import BlobServiceClient
             AZURE_STORAGE_CONNECTION_STRING = (
                 "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;"
-                "AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;"
-                "EndpointSuffix=core.windows.net"
+                "AccountKey=...;EndpointSuffix=core.windows.net"
             )
             blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
             container = blob_service.get_container_client("invoices")
@@ -395,18 +399,12 @@ def serve_pdf(filename):
             stream = blob_client.download_blob()
             pdf_bytes = stream.readall()
 
-            # ✅ Force inline display
-            from flask import Response
             return Response(
                 pdf_bytes,
                 mimetype="application/pdf",
-                headers={
-                    "Content-Disposition": f"inline; filename={filename}"
-                }
+                headers={"Content-Disposition": "inline; filename=%s" % filename}
             )
-
         else:
-            # === Serve file from local downloads/ folder ===
             pdf_dir = os.path.join(os.getcwd(), "downloads")
             return send_from_directory(
                 pdf_dir,
