@@ -373,7 +373,6 @@ def invoices_v2():
 
 
 @app.route("/pdf/<path:filename>")
-@app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
     USE_BLOB = 1
     try:
