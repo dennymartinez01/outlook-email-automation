@@ -4,3 +4,4 @@ msal
 python-dotenv
 gunicorn
 pymongo
+azure-storage-blob
