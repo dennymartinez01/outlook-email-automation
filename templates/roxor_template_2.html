@@ -59,12 +59,12 @@
 
         <!-- Trigger offcanvas -->
         <button type="button"
-            class="btn btn-sm btn-secondary view-pdf"
-            data-pdf="{% if inv.pdf_file.startswith('http') %}{{ inv.pdf_file }}{% else %}/pdf/{{ inv.pdf_file }}{% endif %}"
-            data-bs-toggle="offcanvas"
-            data-bs-target="#pdfOffcanvas">
-          View PDF
-        </button>
+          class="btn btn-sm btn-secondary view-pdf"
+          data-pdf="/pdf/{{ inv.pdf_file | urlencode }}"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#pdfOffcanvas">
+        View PDF
+      </button>
 
       </td>
     </tr>
