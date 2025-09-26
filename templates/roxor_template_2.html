@@ -60,11 +60,11 @@
         <!-- Trigger offcanvas -->
         <button type="button"
           class="btn btn-sm btn-secondary view-pdf"
-          data-pdf="/pdf/{{ inv.pdf_file | urlencode }}"
+          data-pdf="{{ inv.pdf_file }}"
           data-bs-toggle="offcanvas"
           data-bs-target="#pdfOffcanvas">
-        View PDF
-      </button>
+          View PDF
+        </button>
 
       </td>
     </tr>
