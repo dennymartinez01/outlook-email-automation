@@ -1,4 +1,4 @@
-import os
+import os, requests
 import threading
 import time
 import datetime
@@ -134,31 +134,32 @@ def invoices_v2():
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
+    """
+    Serve a PDF from Azure Blob (full URL) or from local /invoices folder.
+    """
     try:
-        if filename.startswith("http"):
-            import requests
-            r = requests.get(filename)
-            return Response(
-                r.content,
-                mimetype="application/pdf",
-                headers={"Content-Disposition": f'inline; filename="{filename}"'}
-            )
+        decoded_filename = unquote(filename)
 
-        from azure.storage.blob import BlobServiceClient
-        AZURE_STORAGE_CONNECTION_STRING = (
-            "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;"
-            "AccountKey=...;EndpointSuffix=core.windows.net"
-        )
-        blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-        container = blob_service.get_container_client("invoices")
-        blob_client = container.get_blob_client(filename)
-        pdf_bytes = blob_client.download_blob().readall()
+        # Case 1: Full external URL (Azure Blob, S3, etc.)
+        if decoded_filename.startswith("http"):
+            resp = requests.get(decoded_filename, stream=True)
+            if resp.status_code == 200:
+                return Response(
+                    resp.iter_content(chunk_size=8192),
+                    content_type="application/pdf"
+                )
+            else:
+                return f"Error fetching PDF from {decoded_filename}", 400
 
-        return Response(pdf_bytes, mimetype="application/pdf",
-                        headers={"Content-Disposition": f'inline; filename="{filename}"'})
+        # Case 2: Local file
+        local_path = os.path.join("invoices", decoded_filename)
+        if os.path.exists(local_path):
+            return send_file(local_path, mimetype="application/pdf")
+
+        return f"PDF not found: {decoded_filename}", 404
+
     except Exception as e:
-        print(f"❌ Error serving PDF {filename}: {e}")
-        return f"Error serving PDF: {e}", 500
+        return f"Error serving PDF: {str(e)}", 500
 
 @app.route("/purge", methods=["POST"])
 def purge_invoices():
