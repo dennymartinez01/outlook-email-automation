@@ -65,9 +65,9 @@ def get_mongo_collection():
     Example: MONGO_URI=MongoClient("mongodb://localhost:27017/")
     """
     mongo_uri = os.getenv("MONGO_URI")
-    if mongo_uri.startswith("MongoClient"):
-        # Strip MongoClient(...) wrapper if it exists
-        mongo_uri = mongo_uri.replace('MongoClient("', '').replace('")', '')
+    # if mongo_uri.startswith("MongoClient"):
+    #     # Strip MongoClient(...) wrapper if it exists
+    #     mongo_uri = mongo_uri.replace('MongoClient("', '').replace('")', '')
     client = MongoClient(mongo_uri)
     db = client["email_invoice_db"]
     return db["invoicecollection"]
