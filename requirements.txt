@@ -3,3 +3,4 @@ requests
 pymongo
 azure-storage-blob
 seqlog
+python-dotenv
