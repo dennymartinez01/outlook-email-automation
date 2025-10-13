@@ -1,250 +1,106 @@
-import msal
-import os
+"""monitor_azure_cosmosdb_cloud_version.py
+
+Regenerated background helper for your project.
+Exposes:
+  - get_graph_token() -> str
+  - check_emails(token) -> list of processed doc ids (or empty list)
+
+This file delegates to the modular service files in services/:
+  - services.azure_graph_service.get_graph_token, fetch_new_messages
+  - services.azure_blob_service.upload_pdf_blob
+  - services.azure_ai_service.analyze_and_store
+"""
+
+import logging
 import time
-import requests
-import re
-from base64 import b64decode
-from pymongo import MongoClient
-from urllib.parse import quote_plus
-from azure.storage.blob import BlobServiceClient, ContentSettings  # 👈 added ContentSettings
+from typing import List
 
-# === Microsoft Graph Auth Config ===
-CLIENT_ID = "148cbb38-c335-4670-9a7f-26918ad4d293"
-TENANT_ID = "a0c1ede5-77c5-4669-af9d-7edf6858c52a"
-CLIENT_SECRET = "x-x8Q~SO9yY3OsNdnU7R4~~_pl-Pj.e36WTtAc3I"
-# TARGET_USER_EMAIL = "docproject@roxorgroup.com"
-TARGET_USER_EMAIL = "NonStockSupplierInvoices@roxorgroup.com"
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPE = ["https://graph.microsoft.com/.default"]
+# Import service functions (these must exist in services/)
+from services.azure_graph_service import get_graph_token as _get_graph_token
+from services.azure_graph_service import fetch_new_messages
+from services.azure_blob_service import upload_pdf_blob
+from services.azure_ai_service import analyze_and_store
 
-# === Azure Document Intelligence Config ===
-AZURE_ENDPOINT = "https://email-invoice-ai.cognitiveservices.azure.com/"
-AZURE_KEY = "5jGo0u0vVCtR8YK1GdnRNoVIFKZDguEDm6W1KhQhXWJZQiqiIlrbJQQJ99BFACmepeSXJ3w3AAALACOG0Ta4"
+logger = logging.getLogger("invoice-monitor.monitor")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-# === Local Download Folder ===
-SAVE_DIR = "downloads"
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-# === saves to local Downloads/
-# USE_BLOB_STORAGE=0
-
-# === saves to Blob Storage
-# AZURE_STORAGE_CONNECTION_STRING=
-
-# === Storage Toggle (decide where PDFs go) ===
-# USE_BLOB = os.environ.get("USE_BLOB_STORAGE", "0") == "1"
-
-# === CONNECTION STRING
-# DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;EndpointSuffix=core.windows.net
-
-USE_BLOB = 1
-
-if USE_BLOB:
-    AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=shqATjIJAAjdiuj6QIQgiIm0I89i5YZUDopT2M5oJIRnulm73qE3k3XfpFVYVkmJFITv6zSS/2Og+AStcSlYuw==;EndpointSuffix=core.windows.net"
-    blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-    container = blob_service.get_container_client("invoices")
-
-def save_attachment(filename: str, content_bytes: bytes) -> str:
-    """Save attachment either to Azure Blob Storage or local Downloads folder."""
-    if USE_BLOB:
-        blob_client = container.get_blob_client(filename)
-        blob_client.upload_blob(
-            content_bytes,
-            overwrite=True,
-            content_settings=ContentSettings(   # 👈 ensures browser renders PDF
-                content_type="application/pdf",
-                content_disposition="inline"
-            )
-        )
-        url = blob_client.url
-        print(f"✅ Uploaded to Blob: {url}")
-        return url  # return blob URL
-    else:
-        full_path = os.path.join(SAVE_DIR, filename)
-        with open(full_path, "wb") as f:
-            f.write(content_bytes)
-        print(f"💾 Saved locally: {full_path}")
-        return os.path.basename(full_path)  # store filename only
-
-# === Authenticate with MS Graph ===
 def get_graph_token():
-    app = msal.ConfidentialClientApplication(
-        client_id=CLIENT_ID,
-        client_credential=CLIENT_SECRET,
-        authority=AUTHORITY
-    )
-    result = app.acquire_token_for_client(scopes=SCOPE)
+    """Return a Graph token by delegating to services.azure_graph_service.get_graph_token."""
+    return _get_graph_token()
 
-    if "access_token" in result:
-        print("✅ Token acquired!")
-        return result["access_token"]
-    else:
-        print("❌ Failed to acquire token")
-        print("Error:", result)
-        return None
+def check_emails(token: str, top: int = 50) -> List[str]:
+    """Fetch new messages and process PDF attachments.
 
-# === Check Emails and Download Attachments ===
-def check_emails(token):
+    - Uses fetch_new_messages(token, top) which should already filter processed attachments.
+    - For each PDF attachment we:
+        1. Upload base64 bytes to Blob via upload_pdf_blob()
+        2. Call analyze_and_store() to send to Form Recognizer and save results
+    - Returns list of successfully stored document ids.
+    """
+    processed_docs = []
+
+    if not token:
+        logger.error("No Graph token provided to check_emails()")
+        return processed_docs
+
     try:
-        headers = {"Authorization": f"Bearer {token}"}
-        url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages?$top=10"
-
-        res = requests.get(url, headers=headers)
-        print("Status Code:", res.status_code)
-        if res.status_code != 200:
-            print("Error:", res.text)
-            return
-
-        emails = res.json().get("value", [])
-        for email in emails:
-            if email.get("hasAttachments", False):
-                att_url = f"https://graph.microsoft.com/v1.0/users/{TARGET_USER_EMAIL}/messages/{email['id']}/attachments"
-                att_res = requests.get(att_url, headers=headers)
-                attachments = att_res.json().get("value", [])
-
-                for att in attachments:
-                    if att.get("contentType") == "application/pdf":
-                        file_name = att.get("name", "invoice.pdf")
-                        file_data = b64decode(att["contentBytes"])
-
-                        # Save either to Blob or local
-                        pdf_ref = save_attachment(file_name, file_data)
-
-                        # Pass the reference (path or URL) + file content to analyzer
-                        analyze_invoice(pdf_ref, file_data)
+        messages = fetch_new_messages(token, top=top)
     except Exception as e:
-        print("❌ Error during email check:", e)
+        logger.exception("Failed to fetch messages from Graph: %s", e)
+        return processed_docs
 
-# === Helpers ===
-def normalize_number(val):
-    if not val:
-        return None
-    return val.replace(",", "").replace(" ", "")
+    logger.info("Processing %d messages", len(messages or []))
 
-# === Analyze Invoice and Store in CosmosDB ===
-def analyze_invoice(pdf_ref, content_bytes):
-    url = f"{AZURE_ENDPOINT}/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31"
-    headers = {
-        "Content-Type": "application/pdf",
-        "Ocp-Apim-Subscription-Key": AZURE_KEY
-    }
+    for msg in messages or []:
+        msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
+        attachments = msg.get("attachments", [])
 
-    res = requests.post(url, headers=headers, data=content_bytes)
-    if res.status_code != 202:
-        print("❌ Failed to submit document:", res.text)
-        return
+        for att in attachments:
+            try:
+                content_type = att.get("contentType", "").lower()
+                if content_type != "application/pdf" and not (att.get("name", "").lower().endswith('.pdf')):
+                    logger.info("Skipping non-pdf attachment: %s (type=%s)", att.get('name'), content_type)
+                    continue
 
-    result_url = res.headers["operation-location"]
-    while True:
-        poll = requests.get(result_url, headers={"Ocp-Apim-Subscription-Key": AZURE_KEY})
-        result = poll.json()
-        if result.get("status") in ["succeeded", "failed"]:
-            break
-        time.sleep(2)
+                attachment_id = att.get("id") or att.get("attachmentId") or "unknown-att"
+                original_name = att.get("name") or "invoice.pdf"
+                safe_name = original_name.replace(" ", "_").replace('/', '_')
+                blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
 
-    if result["status"] == "succeeded":
-        doc = result["analyzeResult"]["documents"][0]
-        fields = doc.get("fields", {})
+                # contentBytes is expected to be base64 string as returned by Microsoft Graph
+                content_b64 = att.get("contentBytes")
+                if not content_b64:
+                    logger.warning("Attachment %s in message %s has no contentBytes; skipping", attachment_id, msg_id)
+                    continue
 
-        invoice_data = {
-            "InvoiceNumber": fields.get("InvoiceId", {}).get("valueString") or fields.get("InvoiceNumber", {}).get("valueString"),
-            "InvoiceDate": fields.get("InvoiceDate", {}).get("valueDate"),
-            "DueDate": fields.get("DueDate", {}).get("valueDate"),
-            "Supplier": {
-                "Name": fields.get("VendorName", {}).get("valueString"),
-                "Address": fields.get("VendorAddress", {}).get("valueAddress")
-            },
-            "Customer": {
-                "Name": fields.get("CustomerName", {}).get("valueString"),
-                "Address": fields.get("CustomerAddress", {}).get("valueAddress")
-            },
-            "Currency": fields.get("Currency", {}).get("valueString"),
-            "SubTotal": fields.get("SubTotal", {}).get("valueNumber"),
-            "TaxAmount": fields.get("TaxAmount", {}).get("valueNumber"),
-            "InvoiceTotal": fields.get("InvoiceTotal", {}).get("valueNumber"),
-            "AmountDue": fields.get("AmountDue", {}).get("valueNumber")
-        }
+                logger.info("Uploading blob for message=%s attachment=%s", msg_id, attachment_id)
+                try:
+                    blob_url = upload_pdf_blob(blob_name, content_b64)
+                except Exception as e:
+                    logger.exception("Blob upload failed for %s (msg=%s): %s", blob_name, msg_id, e)
+                    continue
 
-        # === Fallbacks ===
-        full_text = result["analyzeResult"].get("content", "")
-        if isinstance(full_text, list):
-            full_text = " ".join([p.get("content", "") for p in full_text if isinstance(p, dict)])
+                logger.info("Analyzing invoice for message=%s attachment=%s", msg_id, attachment_id)
+                try:
+                    doc_id = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
+                    processed_docs.append(doc_id)
+                    logger.info("Processed and stored doc_id=%s", doc_id)
+                except Exception as e:
+                    logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
+                    # do not mark processed so it can be retried next run
+                    continue
 
-        regex_patterns = {
-            "InvoiceTotal": r"(?:TOTAL\s*\(.*?\)|INVOICE\s*TOTAL|TOTAL)\s*[:\-]?\s*([\d.,]+)",
-            "SubTotal": r"(?:SUBTOTAL|SUB TOTAL)\s*[:\-]?\s*([\d.,]+)",
-            "TaxAmount": r"(?:TAX\s*AMOUNT|VAT)\s*[:\-]?\s*([\d.,]+)",
-            "AmountDue": r"(?:AMOUNT\s*DUE|BALANCE\s*DUE)\s*[:\-]?\s*([\d.,]+)",
-            "Currency": r"\b(USD|EUR|GBP|PHP|JPY)\b",
-            "DueDate": r"(?:DUE\s*DATE)\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})"
-        }
+            except Exception as e:
+                logger.exception("Unexpected error processing attachment: %s", e)
+                continue
 
-        for key, pattern in regex_patterns.items():
-            if not invoice_data.get(key):
-                matches = re.findall(pattern, full_text, re.IGNORECASE)
-                if matches:
-                    val = matches[-1]
-                    if key in ["InvoiceTotal", "SubTotal", "TaxAmount", "AmountDue"]:
-                        val = normalize_number(val)
-                    invoice_data[key] = val
-                    print(f"✅ Fallback {key} from text: {invoice_data[key]}")
+    return processed_docs
 
-        # === Extract Line Items ===
-        line_items = []
-        tables = result["analyzeResult"].get("tables", [])
-        if isinstance(tables, list):
-            for t in tables:
-                rows = {}
-                for cell in t.get("cells", []):
-                    rows.setdefault(cell.get("rowIndex"), {})[cell.get("columnIndex")] = cell.get("content", "")
-                for row_idx, cols in rows.items():
-                    row_values = [cols[c] for c in sorted(cols.keys())]
-                    if not row_values or any(h in row_values[0].upper() for h in ["DESCRIPTION", "PRODUCT", "SERVICE", "NET", "TOTAL"]):
-                        continue
-                    numeric_values = [normalize_number(v) for v in row_values if re.match(r"^[\d.,]+$", v)]
-                    if numeric_values:
-                        item = {"Description": row_values[0]}
-                        if len(numeric_values) == 3:
-                            item.update({"Net": numeric_values[0], "VAT": numeric_values[1], "Total": numeric_values[2]})
-                        elif len(numeric_values) == 2:
-                            item.update({"Net": numeric_values[0], "Total": numeric_values[1]})
-                        elif len(numeric_values) == 1:
-                            item.update({"Total": numeric_values[0]})
-                        line_items.append(item)
 
-        # === Store to Cosmos DB ===
-        try:
-            # client = MongoClient("mongodb://localhost:27017/")  # change if needed
-            username = quote_plus("mongoadmin")
-            password = quote_plus("P@ssw0rd!!")
-            uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
-
-            client = MongoClient(uri, tls=True)
-            db = client["email_invoice_db"]
-            collection = db["invoicecollection"]
-
-            invoice_number = invoice_data.get("InvoiceNumber")
-            invoice_date = invoice_data.get("InvoiceDate")
-            document_id = f"{invoice_number}_{invoice_date}" if invoice_number and invoice_date else pdf_ref
-
-            if collection.find_one({"_id": document_id}):
-                print(f"⚠️ Duplicate skipped: {document_id}")
-            else:
-                collection.insert_one({
-                    "_id": document_id,
-                    "Invoice": invoice_data,
-                    "LineItems": line_items,
-                    "pdf_file": pdf_ref  # 👈 store either Blob URL or local filename
-                })
-                print(f"✅ Stored in Cosmos DB: {document_id}")
-
-        except Exception as e:
-            print("❌ Failed to store in MongoDB:", e)
-
-# === MAIN ===
 if __name__ == "__main__":
-    token = get_graph_token()
-    if token:
-        check_emails(token)
-    else:
-        print("❌ No token retrieved")
+    # quick local smoke test (will only attempt to fetch token if env/configured)
+    try:
+        tok = get_graph_token()
+        print("Token obtained (length):", len(tok) if tok else "None")
+    except Exception as e:
+        print("Could not get token:", e)

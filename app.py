@@ -1,55 +1,83 @@
-import os, requests
+import os
 import threading
 import time
-import datetime
-import io
-import csv
+import logging
+import atexit
 from bson.objectid import ObjectId
-from flask import Flask, render_template, request, send_file, send_from_directory, jsonify, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response
 from pymongo import MongoClient
-from urllib.parse import quote_plus
+from urllib.parse import unquote
+from dotenv import load_dotenv
+import requests
 import monitor_azure_cosmosdb_cloud_version
 
-app = Flask(__name__)
-invoice_thread_started = False
+# ---------------------------------------------------------------------
+# Load .env file and environment variables
+# ---------------------------------------------------------------------
+load_dotenv()
 
-# ------------------ BACKGROUND THREAD ------------------ #
+# ---------------------------------------------------------------------
+# Flask app setup
+# ---------------------------------------------------------------------
+app = Flask(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("invoice-monitor")
+
+# ---------------------------------------------------------------------
+# Background worker
+# ---------------------------------------------------------------------
+_stop_worker = False
+
 def run_invoice_checker_loop():
-    while True:
+    global _stop_worker
+    while not _stop_worker:
         try:
-            print("🔁 Running invoice check...")
+            logger.info("🔁 Running invoice check...")
             token = monitor_azure_cosmosdb_cloud_version.get_graph_token()
             if token:
                 monitor_azure_cosmosdb_cloud_version.check_emails(token)
             else:
-                print("❌ Failed to get token")
+                logger.warning("❌ Failed to get Graph token.")
         except Exception as e:
-            print(f"❌ Error during invoice check: {e}")
-        time.sleep(180)  # Every 3 minutes
+            logger.exception(f"❌ Error during invoice check: {e}")
+        time.sleep(180)  # every 3 minutes
 
 def start_background_thread():
-    global invoice_thread_started
-    if not invoice_thread_started:
-        thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
-        thread.start()
-        invoice_thread_started = True
-        print("✅ Background thread started")
+    thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
+    thread.start()
+    logger.info("✅ Background invoice monitor thread started.")
 
+def stop_background_thread():
+    global _stop_worker
+    _stop_worker = True
+    logger.info("🛑 Background worker stopping...")
+
+# Start worker when app launches
 start_background_thread()
+atexit.register(stop_background_thread)
 
-# ------------------ MONGO CONNECTION ------------------ #
+# ---------------------------------------------------------------------
+# MongoDB / Cosmos DB connection
+# ---------------------------------------------------------------------
 def get_mongo_collection():
-    username = quote_plus("mongoadmin")
-    password = quote_plus("P@ssw0rd!!")  # 🔒 best to use env var in production
-    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
-    client = MongoClient(uri, tls=True)
+    """
+    Connect to the database defined in .env (MONGO_URI).
+    Example: MONGO_URI=MongoClient("mongodb://localhost:27017/")
+    """
+    mongo_uri = os.getenv("MONGO_URI")
+    if mongo_uri.startswith("MongoClient"):
+        # Strip MongoClient(...) wrapper if it exists
+        mongo_uri = mongo_uri.replace('MongoClient("', '').replace('")', '')
+    client = MongoClient(mongo_uri)
     db = client["email_invoice_db"]
     return db["invoicecollection"]
 
-# ------------------ ROUTES ------------------ #
+# ---------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------
 @app.route("/")
 def home():
-    return "📬 Invoice monitoring is running every 3 minutes. Visit /v2/invoices to view stored data."
+    return "📬 Invoice monitor running. Visit /v2/invoices to view data."
 
 @app.route("/api/invoice/<doc_id>")
 def invoice_detail_json(doc_id):
@@ -60,7 +88,7 @@ def invoice_detail_json(doc_id):
         else:
             doc = collection.find_one({"_id": doc_id})
     except Exception as e:
-        print("❌ Error fetching invoice:", e)
+        logger.exception("❌ Error fetching invoice")
         return jsonify({"error": "Error fetching invoice"}), 500
 
     if not doc:
@@ -71,14 +99,8 @@ def invoice_detail_json(doc_id):
 
 @app.route("/v2/invoices")
 def invoices_v2():
-    username = quote_plus("mongoadmin")
-    password = quote_plus("P@ssw0rd!!")
-    uri = f"mongodb+srv://{username}:{password}@email-monitor-cluster-mongodb.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
-    client = MongoClient(uri, tls=True)
-    db = client["email_invoice_db"]
-    collection = db["invoicecollection"]
+    collection = get_mongo_collection()
 
-    # --- Search ---
     search_query = request.args.get("vendor", "").strip()
     mongo_query = {}
     if search_query:
@@ -89,7 +111,6 @@ def invoices_v2():
             {"Invoice.Customer.Name": regex},
         ]
 
-    # --- Pagination ---
     page = int(request.args.get("page", 1))
     per_page = 10
     total_docs = collection.count_documents(mongo_query)
@@ -106,7 +127,6 @@ def invoices_v2():
     for inv in cursor:
         line_items = inv.get("LineItems", [])
         category = "Stock" if line_items and len(line_items) > 0 else "Non-stock"
-
         invoices.append({
             "_id": str(inv.get("_id")),
             "invoice_no": inv.get("Invoice", {}).get("InvoiceNumber", ""),
@@ -134,31 +154,21 @@ def invoices_v2():
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
-    """
-    Serve a PDF from Azure Blob (full URL) or from local /invoices folder.
-    """
     try:
         decoded_filename = unquote(filename)
-
-        # Case 1: Full external URL (Azure Blob, S3, etc.)
         if decoded_filename.startswith("http"):
             resp = requests.get(decoded_filename, stream=True)
             if resp.status_code == 200:
-                return Response(
-                    resp.iter_content(chunk_size=8192),
-                    content_type="application/pdf"
-                )
-            else:
-                return f"Error fetching PDF from {decoded_filename}", 400
+                return Response(resp.iter_content(chunk_size=8192), content_type="application/pdf")
+            return f"Error fetching PDF from {decoded_filename}", 400
 
-        # Case 2: Local file
         local_path = os.path.join("invoices", decoded_filename)
         if os.path.exists(local_path):
             return send_file(local_path, mimetype="application/pdf")
 
         return f"PDF not found: {decoded_filename}", 404
-
     except Exception as e:
+        logger.exception("Error serving PDF")
         return f"Error serving PDF: {str(e)}", 500
 
 @app.route("/purge", methods=["POST"])
@@ -167,10 +177,10 @@ def purge_invoices():
         collection = get_mongo_collection()
         all_invoices = list(collection.find({}, {"pdf_file": 1}))
         collection.delete_many({})
-        print("✅ All invoices deleted from MongoDB")
+        logger.info("✅ All invoices deleted from MongoDB")
 
         from azure.storage.blob import BlobServiceClient
-        AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=roxorinvoicefiles;AccountKey=...;EndpointSuffix=core.windows.net"
+        AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
         container = blob_service.get_container_client("invoices")
 
@@ -181,15 +191,19 @@ def purge_invoices():
             try:
                 blob_name = pdf_ref.split("/")[-1] if pdf_ref.startswith("http") else pdf_ref
                 container.delete_blob(blob_name)
-                print(f"🗑️ Deleted from Blob: {blob_name}")
+                logger.info(f"🗑️ Deleted from Blob: {blob_name}")
             except Exception as e:
-                print(f"⚠️ Could not delete blob {pdf_ref}: {e}")
+                logger.warning(f"⚠️ Could not delete blob {pdf_ref}: {e}")
 
         return jsonify({"success": True, "message": "All invoices and PDFs purged successfully."})
     except Exception as e:
-        print(f"❌ Purge failed: {e}")
+        logger.exception("❌ Purge failed")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# ------------------ MAIN ------------------ #
+# ---------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.getenv("PORT", 5000))
+    logger.info(f"🚀 Starting Flask server on http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port, debug=True)

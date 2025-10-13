@@ -1,7 +1,5 @@
 flask
 requests
-msal
-python-dotenv
-gunicorn
 pymongo
 azure-storage-blob
+seqlog
