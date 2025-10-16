@@ -1,189 +1,170 @@
+"""
+services/azure_ai_service.py
+
+Handles:
+  - Sending uploaded PDF blobs to Azure Document Intelligence (Form Recognizer)
+  - Extracting structured invoice data
+  - Storing the analysis results into MongoDB (CosmosDB API)
+  - Confidence-based status handling
+  - Automatic Hot→Cool blob tier optimization
+"""
+
 import os
+import io
 import base64
 import logging
 import time
-import requests
-from pymongo import MongoClient, errors
-from datetime import datetime
+from datetime import datetime, timedelta
 
-logger = logging.getLogger("invoice-monitor.ai")
+from pymongo import MongoClient
+from azure.ai.formrecognizer import DocumentAnalysisClient
+from azure.core.credentials import AzureKeyCredential
+from azure.core.exceptions import AzureError
+from azure.storage.blob import BlobServiceClient, StandardBlobTier
 
-# Simple retry helper used for transient network/API errors
-def _with_retries(fn, max_attempts=3, delay_seconds=2, *args, **kwargs):
-    last_exc = None
-    for attempt in range(1, max_attempts + 1):
+# ---------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------
+FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORMRECOGNIZER_ENDPOINT")
+FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORMRECOGNIZER_KEY")
+MONGO_URI = os.getenv("MONGO_URI")
+BLOB_CONN_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+BLOB_CONTAINER = os.getenv("BLOB_CONTAINER", "invoices")
+
+# ---------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------
+logger = logging.getLogger("invoice-monitor.azure-ai-service")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+form_client = DocumentAnalysisClient(
+    endpoint=FORM_RECOGNIZER_ENDPOINT,
+    credential=AzureKeyCredential(FORM_RECOGNIZER_KEY)
+)
+blob_service = BlobServiceClient.from_connection_string(BLOB_CONN_STR)
+blob_container_client = blob_service.get_container_client(BLOB_CONTAINER)
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+def _retry_call(fn, max_retries=3, delay=3):
+    for attempt in range(max_retries):
         try:
-            return fn(*args, **kwargs)
+            return fn()
         except Exception as e:
-            last_exc = e
-            logger.warning("Attempt %d/%d failed: %s", attempt, max_attempts, e)
-            if attempt < max_attempts:
-                time.sleep(delay_seconds)
-    # final raise
-    raise last_exc
+            if attempt < max_retries - 1:
+                logger.warning("Retrying after error (%s)... attempt %d/%d", e, attempt + 1, max_retries)
+                time.sleep(delay)
+            else:
+                logger.error("Max retries exceeded: %s", e)
+                raise
 
+def _transition_to_cool(blob_name: str):
+    """Move blob to Cool tier if older than 7 days."""
+    try:
+        blob_client = blob_container_client.get_blob_client(blob_name)
+        props = blob_client.get_blob_properties()
+        last_modified = props['last_modified']
 
-def _call_form_recognizer(endpoint, key, pdf_bytes, max_attempts=3):
-    """Call Azure Form Recognizer with simple retries and return parsed JSON."""
-    url = f"{endpoint}/formrecognizer/documentModels/prebuilt-invoice:analyze?api-version=2023-07-31"
-    headers = {"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/pdf"}
+        if datetime.utcnow() - last_modified.replace(tzinfo=None) > timedelta(days=7):
+            blob_client.set_standard_blob_tier(StandardBlobTier.Cool)
+            logger.info("🌡️ Transitioned blob '%s' to Cool tier", blob_name)
+    except Exception as e:
+        logger.warning("Could not transition blob '%s' to Cool tier: %s", blob_name, e)
 
-    def _req():
-        resp = requests.post(url, headers=headers, data=pdf_bytes, timeout=60)
-        resp.raise_for_status()
-        return resp.json()
-
-    return _with_retries(_req, max_attempts=max_attempts, delay_seconds=2)
-
-
-def _safe_field_value(field_obj):
-    """Return value and confidence from a Form Recognizer field object in a normalized form."""
-    if not field_obj or not isinstance(field_obj, dict):
-        return {"value": None, "confidence": 0.0}
-
-    # The SDK returns typed values under keys like valueString, valueNumber, valueDate
-    value = field_obj.get("valueString")
-    if value is None:
-        value = field_obj.get("valueNumber")
-    if value is None:
-        value = field_obj.get("valueDate")
-    if value is None:
-        # fallback to raw 'content'
-        value = field_obj.get("content")
-
-    return {"value": value, "confidence": float(field_obj.get("confidence", 0.0))}
-
-
-def analyze_and_store(blob_url, content_b64, msg_id, attachment_id):
+# ---------------------------------------------------------------------
+# Core Analyzer
+# ---------------------------------------------------------------------
+def analyze_and_store(blob_url: str, content_b64: str, msg_id: str, attachment_id: str) -> str:
     """
-    Analyze a PDF invoice via Azure Form Recognizer and store structured data in MongoDB.
+    Analyzes a PDF invoice via Azure Form Recognizer and stores the structured data into MongoDB.
 
-    Returns the inserted document id (string) on success.
-    Raises on unrecoverable errors.
+    Args:
+        blob_url:      The Azure Blob URL (already uploaded)
+        content_b64:   The base64 PDF content
+        msg_id:        Email message ID
+        attachment_id: Attachment ID
+
+    Returns:
+        str: Mongo document ID if stored successfully, else None.
     """
-    endpoint = os.getenv("AZURE_FORMRECOGNIZER_ENDPOINT")
-    key = os.getenv("AZURE_FORMRECOGNIZER_KEY")
-    mongo_uri = os.getenv("MONGO_URI")
+    logger.info("🧠 Starting analysis for blob=%s", blob_url)
+    pdf_bytes = base64.b64decode(content_b64)
 
-    if not endpoint or not key:
-        raise ValueError("AZURE_FORMRECOGNIZER_ENDPOINT and AZURE_FORMRECOGNIZER_KEY must be set")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI must be set to save results to the database")
+    # Analyze with Azure Form Recognizer (with retries)
+    def analyze():
+        return form_client.begin_analyze_document("prebuilt-invoice", pdf_bytes)
 
     try:
-        # Decode PDF bytes
-        pdf_bytes = base64.b64decode(content_b64)
+        poller = _retry_call(analyze)
+        result = poller.result()
+    except AzureError as e:
+        logger.exception("Azure Form Recognizer failed: %s", e)
+        return None
     except Exception as e:
-        logger.exception("Failed to decode base64 PDF bytes: %s", e)
-        raise
+        logger.exception("Error calling Form Recognizer: %s", e)
+        return None
 
-    # 1) Call Form Recognizer
-    logger.info("🧠 Sending PDF to Form Recognizer (msg=%s att=%s)", msg_id, attachment_id)
+    # Extract and structure data
+    invoice_data = {}
+    confidence_scores = []
+
     try:
-        result = _call_form_recognizer(endpoint, key, pdf_bytes, max_attempts=3)
-    except Exception as e:
-        logger.exception("❌ Form Recognizer analysis failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
-        raise
+        for doc in result.documents:
+            for field_name, field_value in doc.fields.items():
+                val = field_value.value if field_value else None
+                conf = field_value.confidence or 0
+                invoice_data[field_name] = val
+                confidence_scores.append(conf)
 
-    # 2) Parse response
-    documents = result.get("documents", [])
-    if not documents:
-        logger.warning("⚠️ No documents returned from Form Recognizer for msg=%s att=%s", msg_id, attachment_id)
-        # Still insert a minimal record so the email is tracked
-        doc_obj = {
-            "Invoice": {},
-            "LineItems": [],
+        # Include line items if present
+        if result.tables:
+            invoice_data["line_items"] = []
+            for table in result.tables:
+                rows = []
+                for cell in table.cells:
+                    rows.append({
+                        "row": cell.row_index,
+                        "column": cell.column_index,
+                        "content": cell.content,
+                        "confidence": cell.confidence
+                    })
+                invoice_data["line_items"].extend(rows)
+
+    except Exception as e:
+        logger.exception("Error parsing Form Recognizer output: %s", e)
+
+    # Compute confidence and status
+    confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
+    status = "Exported" if confidence >= 0.7 else "Needs manual review"
+
+    # MongoDB insert
+    try:
+        client = MongoClient(MONGO_URI)
+        db = client["roxor_invoice_db"]
+        collection = db["invoices"]
+
+        doc_id = f"{msg_id}_{attachment_id}"
+        record = {
+            "_id": doc_id,
+            "invoice_data": invoice_data,
             "pdf_file": blob_url,
-            "confidence": 0.0,
-            "status": "Needs manual review",
-            "processed_at": datetime.utcnow().isoformat(),
-            "source_msg_id": msg_id,
-            "attachment_id": attachment_id,
+            "confidence": confidence,
+            "status": status,
+            "processed_at": datetime.utcnow().isoformat()
         }
-        client = MongoClient(mongo_uri)
-        db = client["email_invoice_db"]
-        collection = db["invoicecollection"]
-        inserted = collection.insert_one(doc_obj)
-        inserted_id = str(inserted.inserted_id)
-        logger.info("🧾 Stored minimal invoice record %s (no document parsed)", inserted_id)
-        return inserted_id
 
-    doc = documents[0]
-    fields = doc.get("fields", {})
-
-    # Build Invoice object with values + confidence
-    invoice = {}
-    for key_name in ["InvoiceId", "InvoiceDate", "DueDate", "InvoiceCurrencyCode", "SubTotal", "TotalTax", "InvoiceTotal", "AmountDue"]:
-        invoice[key_name] = _safe_field_value(fields.get(key_name))
-
-    # Vendor / Customer
-    supplier = {"Name": _safe_field_value(fields.get("VendorName")), "Address": _safe_field_value(fields.get("VendorAddress"))}
-    customer = {"Name": _safe_field_value(fields.get("CustomerName")), "Address": _safe_field_value(fields.get("CustomerAddress"))}
-
-    # Line items: Form Recognizer returns Items as valueArray of valueObject entries
-    raw_items = fields.get("Items", {}).get("valueArray", [])
-    line_items = []
-    for item in raw_items:
-        obj = item.get("valueObject", {})
-        li = {
-            "Description": _safe_field_value(obj.get("Description")),
-            "Net": _safe_field_value(obj.get("Amount")),
-            "VAT": _safe_field_value(obj.get("Tax")),
-            "Total": _safe_field_value(obj.get("TotalAmount")),
-        }
-        line_items.append(li)
-
-    # Compute aggregated confidence for key fields (InvoiceId, InvoiceDate, InvoiceTotal)
-    confs = [
-        invoice.get("InvoiceId", {}).get("confidence", 0.0),
-        invoice.get("InvoiceDate", {}).get("confidence", 0.0),
-        invoice.get("InvoiceTotal", {}).get("confidence", 0.0),
-    ]
-    # Avoid division by zero
-    avg_conf = sum(confs) / (len(confs) if len(confs) else 1)
-
-    status = "Exported" if avg_conf >= 0.7 else "Needs manual review"
-
-    # Build final document for MongoDB
-    doc_obj = {
-        "Invoice": {
-            "InvoiceNumber": invoice.get("InvoiceId", {}).get("value"),
-            "InvoiceDate": invoice.get("InvoiceDate", {}).get("value"),
-            "DueDate": invoice.get("DueDate", {}).get("value"),
-            "Currency": invoice.get("InvoiceCurrencyCode", {}).get("value"),
-            "SubTotal": invoice.get("SubTotal", {}).get("value"),
-            "TaxAmount": invoice.get("TotalTax", {}).get("value"),
-            "InvoiceTotal": invoice.get("InvoiceTotal", {}).get("value"),
-            "AmountDue": invoice.get("AmountDue", {}).get("value"),
-            "Supplier": {"Name": supplier.get("Name", {}).get("value"), "Address": supplier.get("Address", {}).get("value")},
-            "Customer": {"Name": customer.get("Name", {}).get("value"), "Address": customer.get("Address", {}).get("value")}
-        },
-        "LineItems": line_items,
-        "pdf_file": blob_url,
-        "confidence": avg_conf,
-        "confidence_detail": {
-            "InvoiceId": invoice.get("InvoiceId", {}).get("confidence"),
-            "InvoiceDate": invoice.get("InvoiceDate", {}).get("confidence"),
-            "InvoiceTotal": invoice.get("InvoiceTotal", {}).get("confidence"),
-        },
-        "status": status,
-        "processed_at": datetime.utcnow().isoformat(),
-        "source_msg_id": msg_id,
-        "attachment_id": attachment_id,
-    }
-
-    # Insert into MongoDB (CosmosDB/Mongo API aware)
-    try:
-        client = MongoClient(mongo_uri)
-        db = client["email_invoice_db"]
-        collection = db["invoicecollection"]
-        result = collection.insert_one(doc_obj)
-        inserted_id = str(result.inserted_id)
-        logger.info("🧾 Stored invoice %s (status=%s, confidence=%.3f)", inserted_id, status, avg_conf)
-        return inserted_id
-    except errors.PyMongoError as e:
-        logger.exception("❌ Failed to insert invoice into MongoDB: %s", e)
-        raise
+        collection.insert_one(record)
+        logger.info("🧾 Stored invoice %s (status=%s, confidence=%.2f)", doc_id, status, confidence)
     except Exception as e:
-        logger.exception("❌ Unexpected error storing invoice: %s", e)
-        raise
+        logger.exception("Database insert failed: %s", e)
+        return None
+
+    # Schedule tier transition (Hot → Cool)
+    try:
+        blob_name = blob_url.split("/")[-1]
+        _transition_to_cool(blob_name)
+    except Exception as e:
+        logger.warning("Blob tier management skipped for %s: %s", blob_url, e)
+
+    return doc_id
