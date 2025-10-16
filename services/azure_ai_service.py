@@ -7,6 +7,9 @@ from azure.core.credentials import AzureKeyCredential
 from pymongo import MongoClient
 from services.logger_utils import logger
 from azure.ai.formrecognizer import _models  # For AddressValue, CurrencyValue, etc.
+from dotenv import load_dotenv
+
+load_dotenv()  # <-- This loads .env into os.environ
 
 # ---------------------------------------------------------------------
 # MongoDB and Azure setup
