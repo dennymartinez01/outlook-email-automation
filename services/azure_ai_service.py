@@ -26,7 +26,7 @@ def analyze_and_store(blob_url, doc_id, invoice_data):
     status = "Exported" if confidence >= 0.7 else "Needs manual review"
 
     client = MongoClient(MONGO_URI)
-    db = client["roxor_invoice_db"]
+    db = client["email_invoice_db"]
     collection = db["invoices"]
 
     record = {
