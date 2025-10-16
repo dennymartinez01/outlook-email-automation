@@ -11,8 +11,8 @@ from azure.ai.formrecognizer import _models  # For AddressValue, CurrencyValue, 
 # ---------------------------------------------------------------------
 # MongoDB and Azure setup
 # ---------------------------------------------------------------------
-FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
-FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
+FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORMRECOGNIZER_ENDPOINT")
+FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORMRECOGNIZER_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 
 if not (FORM_RECOGNIZER_ENDPOINT and FORM_RECOGNIZER_KEY and MONGO_URI):
@@ -98,8 +98,8 @@ def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None):
 
         # Store in MongoDB (Cosmos)
         mongo_client = MongoClient(MONGO_URI)
-        db = mongo_client["roxor_invoice_db"]
-        collection = db["invoices"]
+        db = mongo_client["email_invoice_db"]
+        collection = db["invoicecollection"]
 
         # Insert safely
         collection.insert_one(record)
