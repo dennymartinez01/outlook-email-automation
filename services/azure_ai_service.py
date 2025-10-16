@@ -1,170 +1,112 @@
-"""
-services/azure_ai_service.py
-
-Handles:
-  - Sending uploaded PDF blobs to Azure Document Intelligence (Form Recognizer)
-  - Extracting structured invoice data
-  - Storing the analysis results into MongoDB (CosmosDB API)
-  - Confidence-based status handling
-  - Automatic Hot→Cool blob tier optimization
-"""
-
 import os
-import io
 import base64
-import logging
-import time
-from datetime import datetime, timedelta
-
-from pymongo import MongoClient
+import json
+from datetime import datetime
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import AzureError
-from azure.storage.blob import BlobServiceClient, StandardBlobTier
+from pymongo import MongoClient
+from services.logger_utils import logger
+from azure.ai.formrecognizer import _models  # For AddressValue, CurrencyValue, etc.
 
 # ---------------------------------------------------------------------
-# Environment
+# MongoDB and Azure setup
 # ---------------------------------------------------------------------
-FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORMRECOGNIZER_ENDPOINT")
-FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORMRECOGNIZER_KEY")
+FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
+FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
-BLOB_CONN_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-BLOB_CONTAINER = os.getenv("BLOB_CONTAINER", "invoices")
 
-# ---------------------------------------------------------------------
-# Setup
-# ---------------------------------------------------------------------
-logger = logging.getLogger("invoice-monitor.azure-ai-service")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
-form_client = DocumentAnalysisClient(
-    endpoint=FORM_RECOGNIZER_ENDPOINT,
-    credential=AzureKeyCredential(FORM_RECOGNIZER_KEY)
-)
-blob_service = BlobServiceClient.from_connection_string(BLOB_CONN_STR)
-blob_container_client = blob_service.get_container_client(BLOB_CONTAINER)
+if not (FORM_RECOGNIZER_ENDPOINT and FORM_RECOGNIZER_KEY and MONGO_URI):
+    logger.warning("⚠️ Missing some required environment variables for Azure AI or MongoDB connection.")
 
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
-def _retry_call(fn, max_retries=3, delay=3):
-    for attempt in range(max_retries):
-        try:
-            return fn()
-        except Exception as e:
-            if attempt < max_retries - 1:
-                logger.warning("Retrying after error (%s)... attempt %d/%d", e, attempt + 1, max_retries)
-                time.sleep(delay)
-            else:
-                logger.error("Max retries exceeded: %s", e)
-                raise
-
-def _transition_to_cool(blob_name: str):
-    """Move blob to Cool tier if older than 7 days."""
-    try:
-        blob_client = blob_container_client.get_blob_client(blob_name)
-        props = blob_client.get_blob_properties()
-        last_modified = props['last_modified']
-
-        if datetime.utcnow() - last_modified.replace(tzinfo=None) > timedelta(days=7):
-            blob_client.set_standard_blob_tier(StandardBlobTier.Cool)
-            logger.info("🌡️ Transitioned blob '%s' to Cool tier", blob_name)
-    except Exception as e:
-        logger.warning("Could not transition blob '%s' to Cool tier: %s", blob_name, e)
+def sanitize_for_mongo(data):
+    """Recursively convert Azure SDK model objects into Mongo-safe Python types."""
+    if isinstance(data, dict):
+        return {k: sanitize_for_mongo(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_for_mongo(v) for v in data]
+    elif isinstance(data, _models.AddressValue):
+        return {
+            "house_number": data.house_number,
+            "road": data.road,
+            "city": data.city,
+            "postal_code": data.postal_code,
+            "country_region": data.country_region,
+            "street_address": data.street_address,
+            "state_district": data.state_district,
+        }
+    elif isinstance(data, _models.CurrencyValue):
+        return {
+            "amount": data.amount,
+            "symbol": data.symbol,
+            "code": data.code,
+        }
+    elif hasattr(data, "__dict__"):
+        return {k: sanitize_for_mongo(v) for k, v in vars(data).items()}
+    else:
+        return data
 
 # ---------------------------------------------------------------------
-# Core Analyzer
+# Main: Analyze and store
 # ---------------------------------------------------------------------
-def analyze_and_store(blob_url: str, content_b64: str, msg_id: str, attachment_id: str) -> str:
+def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None):
     """
-    Analyzes a PDF invoice via Azure Form Recognizer and stores the structured data into MongoDB.
-
-    Args:
-        blob_url:      The Azure Blob URL (already uploaded)
-        content_b64:   The base64 PDF content
-        msg_id:        Email message ID
-        attachment_id: Attachment ID
-
-    Returns:
-        str: Mongo document ID if stored successfully, else None.
+    Analyze a PDF invoice stored in Azure Blob and store structured data in MongoDB.
+    Returns the stored document ID or None on failure.
     """
-    logger.info("🧠 Starting analysis for blob=%s", blob_url)
-    pdf_bytes = base64.b64decode(content_b64)
-
-    # Analyze with Azure Form Recognizer (with retries)
-    def analyze():
-        return form_client.begin_analyze_document("prebuilt-invoice", pdf_bytes)
-
     try:
-        poller = _retry_call(analyze)
+        client = DocumentAnalysisClient(
+            endpoint=FORM_RECOGNIZER_ENDPOINT,
+            credential=AzureKeyCredential(FORM_RECOGNIZER_KEY)
+        )
+
+        logger.info(f"🧠 Starting analysis for blob={blob_url}")
+
+        # Decode PDF content bytes
+        content_bytes = base64.b64decode(content_b64)
+
+        poller = client.begin_analyze_document("prebuilt-invoice", document=content_bytes)
         result = poller.result()
-    except AzureError as e:
-        logger.exception("Azure Form Recognizer failed: %s", e)
-        return None
-    except Exception as e:
-        logger.exception("Error calling Form Recognizer: %s", e)
-        return None
 
-    # Extract and structure data
-    invoice_data = {}
-    confidence_scores = []
+        if not result.documents:
+            logger.warning("⚠️ No invoice documents detected in analysis result.")
+            return None
 
-    try:
-        for doc in result.documents:
-            for field_name, field_value in doc.fields.items():
-                val = field_value.value if field_value else None
-                conf = field_value.confidence or 0
-                invoice_data[field_name] = val
-                confidence_scores.append(conf)
+        document = result.documents[0]
+        invoice_data = {}
 
-        # Include line items if present
-        if result.tables:
-            invoice_data["line_items"] = []
-            for table in result.tables:
-                rows = []
-                for cell in table.cells:
-                    rows.append({
-                        "row": cell.row_index,
-                        "column": cell.column_index,
-                        "content": cell.content,
-                        "confidence": cell.confidence
-                    })
-                invoice_data["line_items"].extend(rows)
+        # Flatten extracted fields
+        for name, field in document.fields.items():
+            invoice_data[name] = field.value if hasattr(field, "value") else str(field)
 
-    except Exception as e:
-        logger.exception("Error parsing Form Recognizer output: %s", e)
+        confidence_values = [f.confidence for f in document.fields.values() if hasattr(f, "confidence")]
+        confidence = sum(confidence_values) / len(confidence_values) if confidence_values else 0.0
+        status = "Exported" if confidence >= 0.7 else "Needs manual review"
 
-    # Compute confidence and status
-    confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
-    status = "Exported" if confidence >= 0.7 else "Needs manual review"
-
-    # MongoDB insert
-    try:
-        client = MongoClient(MONGO_URI)
-        db = client["roxor_invoice_db"]
-        collection = db["invoices"]
-
-        doc_id = f"{msg_id}_{attachment_id}"
+        # Prepare record
+        doc_id = f"{msg_id}_{attachment_id}" if msg_id and attachment_id else f"doc_{datetime.utcnow().timestamp()}"
         record = {
             "_id": doc_id,
-            "invoice_data": invoice_data,
+            "invoice_data": sanitize_for_mongo(invoice_data),
             "pdf_file": blob_url,
             "confidence": confidence,
             "status": status,
-            "processed_at": datetime.utcnow().isoformat()
+            "processed_at": datetime.utcnow().isoformat(),
         }
 
+        # Store in MongoDB (Cosmos)
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client["roxor_invoice_db"]
+        collection = db["invoices"]
+
+        # Insert safely
         collection.insert_one(record)
-        logger.info("🧾 Stored invoice %s (status=%s, confidence=%.2f)", doc_id, status, confidence)
+        logger.info(f"🧾 Stored invoice {doc_id} (status={status}, confidence={confidence:.2f})")
+
+        return doc_id
+
     except Exception as e:
-        logger.exception("Database insert failed: %s", e)
+        logger.exception(f"❌ Failed to analyze/store invoice: {e}")
         return None
-
-    # Schedule tier transition (Hot → Cool)
-    try:
-        blob_name = blob_url.split("/")[-1]
-        _transition_to_cool(blob_name)
-    except Exception as e:
-        logger.warning("Blob tier management skipped for %s: %s", blob_url, e)
-
-    return doc_id

@@ -21,6 +21,7 @@ Delegated service modules:
 import logging
 import time
 from typing import List
+from azure.ai.formrecognizer import _models  # for AddressValue, etc.
 
 from services.azure_graph_service import get_graph_token as _get_graph_token
 from services.azure_graph_service import fetch_new_messages
@@ -35,6 +36,36 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
+
+# ---------------------------------------------------------------------
+# Serialization helper (critical fix)
+# ---------------------------------------------------------------------
+def sanitize_for_mongo(data):
+    """Recursively convert non-serializable Azure Form Recognizer model objects into JSON-safe dictionaries."""
+    if isinstance(data, dict):
+        return {k: sanitize_for_mongo(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_for_mongo(v) for v in data]
+    elif isinstance(data, _models.AddressValue):
+        return {
+            "house_number": data.house_number,
+            "road": data.road,
+            "city": data.city,
+            "postal_code": data.postal_code,
+            "country_region": data.country_region,
+            "street_address": data.street_address,
+            "state_district": data.state_district,
+        }
+    elif isinstance(data, _models.CurrencyValue):
+        return {
+            "amount": data.amount,
+            "symbol": data.symbol,
+            "code": data.code,
+        }
+    elif hasattr(data, "__dict__"):
+        return {k: sanitize_for_mongo(v) for k, v in vars(data).items()}
+    else:
+        return data
 
 # ---------------------------------------------------------------------
 # Token helper
@@ -116,10 +147,12 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 # --- Analyze + Store via Azure AI ---
                 try:
                     logger.info("🧠 Analyzing invoice for %s...", filename)
-                    doc_id = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
-                    if doc_id:
-                        processed_docs.append(doc_id)
-                        logger.info("🧾 Stored invoice %s successfully.", doc_id)
+                    result = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
+                    if result:
+                        # Apply sanitization before MongoDB insert
+                        safe_result = sanitize_for_mongo(result)
+                        processed_docs.append(safe_result.get("_id") or safe_result)
+                        logger.info("🧾 Stored invoice successfully: %s", safe_result.get("_id"))
                     else:
                         logger.warning("⚠️ analyze_and_store returned no doc_id for %s", filename)
                 except Exception as e:
