@@ -27,7 +27,7 @@ if not (FORM_RECOGNIZER_ENDPOINT and FORM_RECOGNIZER_KEY and MONGO_URI):
 def sanitize_for_mongo(data):
     """
     Recursively convert Azure SDK model objects into Mongo-safe Python types.
-    Handles all common prebuilt-invoice field types.
+    Works with older SDK versions (like 3.3.3).
     """
     from azure.ai.formrecognizer import _models
 
@@ -51,21 +51,30 @@ def sanitize_for_mongo(data):
             "symbol": data.symbol,
             "code": data.code,
         }
-    elif isinstance(data, _models.DateValue):
-        return data.date.isoformat() if data.date else None
-    elif isinstance(data, _models.TimeValue):
-        return str(data.time) if data.time else None
-    elif isinstance(data, _models.PhoneNumberValue):
-        return data.value
-    elif isinstance(data, _models.EmailValue):
-        return data.value
     elif isinstance(data, _models.DocumentField):
-        # Recursive for nested fields
-        return sanitize_for_mongo(getattr(data, "value", None))
+        # Use value_type to safely extract the value
+        if hasattr(data, "value"):
+            if data.value_type == "date":
+                return str(data.value) if data.value else None
+            elif data.value_type == "time":
+                return str(data.value) if data.value else None
+            elif data.value_type == "phoneNumber":
+                return str(data.value) if data.value else None
+            elif data.value_type == "email":
+                return str(data.value) if data.value else None
+            elif data.value_type in ["string", "number", "integer", "float", "boolean"]:
+                return data.value
+            elif data.value_type in ["list", "dictionary"]:
+                return sanitize_for_mongo(data.value)
+            else:
+                return str(data.value)  # fallback
+        else:
+            return None
     elif hasattr(data, "__dict__"):
         return {k: sanitize_for_mongo(v) for k, v in vars(data).items()}
     else:
         return data
+
 
 
 # ---------------------------------------------------------------------
