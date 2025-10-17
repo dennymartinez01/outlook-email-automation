@@ -101,56 +101,56 @@ def invoice_detail_json(doc_id):
 def invoices_v2():
     collection = get_mongo_collection()
 
-    search_query = request.args.get("vendor", "").strip()
-    mongo_query = {}
-    if search_query:
-        regex = {"$regex": search_query, "$options": "i"}
-        mongo_query["$or"] = [
-            {"Invoice.InvoiceNumber": regex},
-            {"Invoice.Supplier.Name": regex},
-            {"Invoice.Customer.Name": regex},
-        ]
+    # 🔍 Search query from user
+    search_query = request.args.get("vendor", "").strip().lower()
 
-    page = int(request.args.get("page", 1))
-    per_page = 10
-    total_docs = collection.count_documents(mongo_query)
-    total_pages = max(1, (total_docs + per_page - 1) // per_page)
-
-    cursor = (
-        collection.find(mongo_query)
-        .sort("Invoice.InvoiceDate", -1)
-        .skip((page - 1) * per_page)
-        .limit(per_page)
-    )
+    # Fetch all invoices (you can later add MongoDB regex filtering)
+    docs = list(collection.find().sort("processed_at", -1))
 
     invoices = []
-    for inv in cursor:
-        line_items = inv.get("LineItems", [])
-        category = "Stock" if line_items and len(line_items) > 0 else "Non-stock"
+    for doc in docs:
+        data = doc.get("invoice_data", {})
+        total_data = data.get("InvoiceTotal", {}) or {}
+
+        # Optional: text filter
+        vendor_name = (data.get("VendorName") or "").lower()
+        invoice_no = str(data.get("InvoiceId", "")).lower()
+        customer_name = (data.get("CustomerName") or "").lower()
+
+        if search_query and search_query not in vendor_name and search_query not in invoice_no and search_query not in customer_name:
+            continue
+
         invoices.append({
-            "_id": str(inv.get("_id")),
-            "invoice_no": inv.get("Invoice", {}).get("InvoiceNumber", ""),
-            "date": inv.get("Invoice", {}).get("InvoiceDate", ""),
-            "vendor": inv.get("Invoice", {}).get("Supplier", {}).get("Name", ""),
-            "customer": inv.get("Invoice", {}).get("Customer", {}).get("Name", ""),
-            "total": inv.get("Invoice", {}).get("InvoiceTotal", 0),
-            "category": category,
-            "status": "Exported",
-            "pdf_file": inv.get("pdf_file", "")
+            "_id": str(doc.get("_id")),
+            "invoice_no": data.get("InvoiceId", "N/A"),
+            "date": data.get("InvoiceDate", "N/A"),
+            "vendor": data.get("VendorName", "N/A").replace("\n", " "),
+            "customer": data.get("CustomerName", "N/A").replace("\n", " "),
+            "total": f"{total_data.get('symbol', '')}{total_data.get('amount', '')}",
+            "status": doc.get("status", "N/A"),
+            "pdf_file": doc.get("pdf_file", "")
         })
+
+    # Pagination logic
+    page = int(request.args.get("page", 1))
+    per_page = 10
+    total_pages = (len(invoices) + per_page - 1) // per_page or 1
+    start = (page - 1) * per_page
+    end = start + per_page
 
     start_page = max(1, page - 2)
     end_page = min(total_pages, page + 2)
 
     return render_template(
         "roxor_template_3.html",
-        invoices=invoices,
+        invoices=invoices[start:end],
         vendor=search_query,
         page=page,
         total_pages=total_pages,
         start_page=start_page,
         end_page=end_page
     )
+
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
