@@ -83,6 +83,7 @@ def home():
 def invoice_detail_json(doc_id):
     collection = get_mongo_collection()
     try:
+        # handle both string and ObjectId _id
         if ObjectId.is_valid(doc_id):
             doc = collection.find_one({"_id": ObjectId(doc_id)})
         else:
@@ -94,8 +95,40 @@ def invoice_detail_json(doc_id):
     if not doc:
         return jsonify({"error": "Invoice not found"}), 404
 
-    doc["_id"] = str(doc["_id"])
-    return jsonify(doc)
+    inv_data = doc.get("invoice_data", {})
+
+    # ✅ build structure matching your Jinja JavaScript expectations
+    invoice = {
+        "InvoiceNumber": inv_data.get("InvoiceId", ""),
+        "InvoiceDate": inv_data.get("InvoiceDate", ""),
+        "DueDate": inv_data.get("DueDate", ""),
+        "Supplier": {"Name": inv_data.get("VendorName", "").replace("\n", " ")},
+        "Customer": {"Name": inv_data.get("CustomerName", "").replace("\n", " ")},
+        "Currency": inv_data.get("InvoiceTotal", {}).get("code", ""),
+        "SubTotal": inv_data.get("SubTotal", {}).get("amount", ""),
+        "TaxAmount": inv_data.get("TotalTax", {}).get("amount", ""),
+        "InvoiceTotal": inv_data.get("InvoiceTotal", {}).get("amount", ""),
+        "AmountDue": inv_data.get("AmountDue", {}).get("amount", ""),
+    }
+
+    # ✅ normalize line items
+    line_items = []
+    for item in inv_data.get("Items", []):
+        line_items.append({
+            "Description": item.get("Description", ""),
+            "Net": item.get("Amount", ""),
+            "VAT": next((tax.get("Amount") for tax in inv_data.get("TaxDetails", []) if tax.get("Amount")), ""),
+            "Total": item.get("Amount", "")
+        })
+
+    return jsonify({
+        "Invoice": invoice,
+        "LineItems": line_items,
+        "pdf_file": doc.get("pdf_file", ""),
+        "status": doc.get("status", ""),
+        "_id": str(doc.get("_id")),
+    })
+
 
 @app.route("/v2/invoices")
 def invoices_v2():
