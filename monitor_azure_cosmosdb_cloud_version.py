@@ -10,16 +10,11 @@ Responsibilities:
   • Send each PDF to Azure AI Form Recognizer
   • Store parsed invoice data into MongoDB (CosmosDB API)
   • Maintain logging for every step
-
-Delegated service modules:
-  - services.azure_graph_service.get_graph_token
-  - services.azure_graph_service.fetch_new_messages
-  - services.azure_blob_service.upload_pdf_blob
-  - services.azure_ai_service.analyze_and_store
 """
 
 import logging
 import time
+import base64
 from typing import List
 from azure.ai.formrecognizer import _models  # for AddressValue, etc.
 
@@ -38,7 +33,7 @@ logging.basicConfig(
 )
 
 # ---------------------------------------------------------------------
-# Serialization helper (critical fix)
+# Serialization helper
 # ---------------------------------------------------------------------
 def sanitize_for_mongo(data):
     """Recursively convert non-serializable Azure Form Recognizer model objects into JSON-safe dictionaries."""
@@ -75,7 +70,7 @@ def get_graph_token() -> str:
     return _get_graph_token()
 
 # ---------------------------------------------------------------------
-# Core loop
+# Core processing
 # ---------------------------------------------------------------------
 def check_emails(token: str, top: int = 50) -> List[str]:
     """
@@ -84,16 +79,10 @@ def check_emails(token: str, top: int = 50) -> List[str]:
     Flow per email:
       1. Fetch via Graph API (using services.azure_graph_service)
       2. For each PDF attachment:
+           • Decode Base64 to raw bytes
            • Upload PDF to Blob via upload_pdf_blob()
            • Analyze + store results using analyze_and_store()
       3. Return list of stored document IDs
-
-    Args:
-        token: Graph access token
-        top:   Max messages to fetch per cycle
-
-    Returns:
-        List of successfully processed document IDs.
     """
     processed_docs: List[str] = []
 
@@ -101,6 +90,7 @@ def check_emails(token: str, top: int = 50) -> List[str]:
         logger.error("❌ No Graph token provided to check_emails()")
         return processed_docs
 
+    # Fetch messages with attachments
     try:
         messages = fetch_new_messages(token, top=top)
     except Exception as e:
@@ -113,14 +103,14 @@ def check_emails(token: str, top: int = 50) -> List[str]:
     for msg in messages or []:
         msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
         attachments = msg.get("attachments", [])
-
-        logger.info("Processing message %s with %d attachments", msg_id, len(attachments))
+        logger.info("Processing message %s with %d attachment(s)", msg_id, len(attachments))
 
         for att in attachments:
             try:
-                # --- Validate attachment type ---
                 content_type = att.get("contentType", "").lower()
                 filename = att.get("name") or "invoice.pdf"
+
+                # Only process PDF attachments
                 if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
                     logger.info("Skipping non-PDF attachment: %s (type=%s)", filename, content_type)
                     continue
@@ -129,17 +119,23 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 safe_name = filename.replace(" ", "_").replace("/", "_")
                 blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
 
-                # --- Extract content bytes ---
                 content_b64 = att.get("contentBytes")
                 if not content_b64:
                     logger.warning("Attachment %s in message %s has no contentBytes; skipping", attachment_id, msg_id)
                     continue
 
-                # --- Upload to Azure Blob ---
+                # --- Decode base64 into real PDF bytes ---
+                try:
+                    file_bytes = base64.b64decode(content_b64)
+                except Exception as e:
+                    logger.error("❌ Failed to decode attachment %s in message %s: %s", attachment_id, msg_id, e)
+                    continue
+
+                # --- Upload to Azure Blob (binary bytes, not Base64) ---
                 try:
                     logger.info("☁️ Uploading blob: %s", blob_name)
-                    blob_url = upload_pdf_blob(blob_name, content_b64)
-                    logger.info("✅ Blob uploaded successfully: %s", blob_url)
+                    blob_url = upload_pdf_blob(blob_name, file_bytes)
+                    logger.info("✅ Uploaded successfully: %s", blob_url)
                 except Exception as e:
                     logger.exception("Blob upload failed for %s (msg=%s): %s", blob_name, msg_id, e)
                     continue
@@ -149,12 +145,11 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                     logger.info("🧠 Analyzing invoice for %s...", filename)
                     result = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
                     if result:
-                        # Apply sanitization before MongoDB insert
                         safe_result = sanitize_for_mongo(result)
                         processed_docs.append(safe_result.get("_id") or safe_result)
                         logger.info("🧾 Stored invoice successfully: %s", safe_result.get("_id"))
                     else:
-                        logger.warning("⚠️ analyze_and_store returned no doc_id for %s", filename)
+                        logger.warning("⚠️ No result returned for %s", filename)
                 except Exception as e:
                     logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
                     continue
@@ -163,11 +158,11 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
                 continue
 
-    logger.info("✅ Completed processing %d messages; %d stored documents", msg_count, len(processed_docs))
+    logger.info("✅ Completed processing %d message(s); %d stored document(s)", msg_count, len(processed_docs))
     return processed_docs
 
 # ---------------------------------------------------------------------
-# Optional: continuous loop
+# Optional: continuous monitor
 # ---------------------------------------------------------------------
 def run_forever(interval_seconds: int = 180):
     """Continuously check inbox every few minutes."""
