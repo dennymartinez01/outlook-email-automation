@@ -156,7 +156,12 @@ def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None):
 
         try:
             record = make_bson_safe(record)
-            collection.insert_one(record)
+            # collection.insert_one(record)
+            collection.update_one(
+                {"_id": doc_id},
+                {"$set": record},
+                upsert=True
+            )
             logger.info(f"🧾 Stored invoice {doc_id} (status={status}, confidence={confidence:.2f})")
         except Exception as mongo_err:
             logger.exception(f"❌ Failed to insert record in MongoDB: {mongo_err}")
