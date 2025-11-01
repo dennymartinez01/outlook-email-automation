@@ -1,88 +1,33 @@
+# monitor_azure_cosmosdb_cloud_version.py
 """
-monitor_azure_cosmosdb_cloud_version.py
-
-Background invoice-monitoring helper for your Azure App Service deployment.
-
-Responsibilities:
-  • Acquire Microsoft Graph token (via services.azure_graph_service)
-  • Fetch new email messages and attachments
-  • Upload PDF invoices to Azure Blob Storage
-  • Send each PDF to Azure AI Form Recognizer
-  • Store parsed invoice data into MongoDB (CosmosDB API)
-  • Maintain logging for every step
+Monitors Outlook mailbox for invoice PDFs:
+ - Fetches new messages via Microsoft Graph
+ - Skips messages already processed (Mongo 'processed_attachments')
+ - Downloads PDF attachments via Graph /$value
+ - Uploads to Azure Blob (inline-displayed PDFs)
+ - Analyzes invoices using Azure Form Recognizer
+ - Stores results in MongoDB ('invoicecollection')
+ - Records success/failure status in 'processed_attachments'
 """
 
-import logging
-import time
-import base64
 from typing import List
-from azure.ai.formrecognizer import _models  # for AddressValue, etc.
-
-from services.azure_graph_service import get_graph_token as _get_graph_token
-from services.azure_graph_service import fetch_new_messages
+from services.logger_utils import logger
+from services.checkpoint_service import mark_message_processed, is_message_processed
+from services.failure_service import record_failure
 from services.azure_blob_service import upload_pdf_blob
 from services.azure_ai_service import analyze_and_store
-
-# ---------------------------------------------------------------------
-# Logging setup
-# ---------------------------------------------------------------------
-logger = logging.getLogger("invoice-monitor")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+from services.azure_graph_service import (
+    get_graph_token,
+    fetch_new_messages,
+    list_message_attachments,
+    download_attachment_bytes,
 )
 
-# ---------------------------------------------------------------------
-# Serialization helper
-# ---------------------------------------------------------------------
-def sanitize_for_mongo(data):
-    """Recursively convert non-serializable Azure Form Recognizer model objects into JSON-safe dictionaries."""
-    if isinstance(data, dict):
-        return {k: sanitize_for_mongo(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [sanitize_for_mongo(v) for v in data]
-    elif isinstance(data, _models.AddressValue):
-        return {
-            "house_number": data.house_number,
-            "road": data.road,
-            "city": data.city,
-            "postal_code": data.postal_code,
-            "country_region": data.country_region,
-            "street_address": data.street_address,
-            "state_district": data.state_district,
-        }
-    elif isinstance(data, _models.CurrencyValue):
-        return {
-            "amount": data.amount,
-            "symbol": data.symbol,
-            "code": data.code,
-        }
-    elif hasattr(data, "__dict__"):
-        return {k: sanitize_for_mongo(v) for k, v in vars(data).items()}
-    else:
-        return data
 
-# ---------------------------------------------------------------------
-# Token helper
-# ---------------------------------------------------------------------
-def get_graph_token() -> str:
-    """Return a Microsoft Graph token via azure_graph_service."""
-    return _get_graph_token()
-
-# ---------------------------------------------------------------------
-# Core processing
-# ---------------------------------------------------------------------
 def check_emails(token: str, top: int = 50) -> List[str]:
     """
-    Fetch new messages and process any PDF attachments.
-
-    Flow per email:
-      1. Fetch via Graph API (using services.azure_graph_service)
-      2. For each PDF attachment:
-           • Decode Base64 to raw bytes
-           • Upload PDF to Blob via upload_pdf_blob()
-           • Analyze + store results using analyze_and_store()
-      3. Return list of stored document IDs
+    Fetch new messages and process PDF attachments.
+    Returns list of processed document IDs (from analyze_and_store).
     """
     processed_docs: List[str] = []
 
@@ -90,105 +35,104 @@ def check_emails(token: str, top: int = 50) -> List[str]:
         logger.error("❌ No Graph token provided to check_emails()")
         return processed_docs
 
-    # Fetch messages with attachments
     try:
         messages = fetch_new_messages(token, top=top)
     except Exception as e:
-        logger.exception("Failed to fetch messages from Graph: %s", e)
+        logger.exception("❌ Failed to fetch messages from Graph: %s", e)
         return processed_docs
 
-    msg_count = len(messages or [])
-    logger.info("📬 Retrieved %d new messages from Graph", msg_count)
+    logger.info("📬 Retrieved %d messages from Graph.", len(messages or []))
 
     for msg in messages or []:
-        msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
-        attachments = msg.get("attachments", [])
-        logger.info("Processing message %s with %d attachment(s)", msg_id, len(attachments))
+        msg_id = msg.get("id") or msg.get("messageId")
+        if not msg_id:
+            logger.warning("⚠️ Skipping message with no id: %s", msg)
+            continue
+
+        # Skip if message already processed successfully
+        if is_message_processed(msg_id):
+            logger.info("⏩ Skipping already processed message %s", msg_id)
+            continue
+
+        logger.info("🔍 Processing message %s (%s)", msg_id, msg.get("subject", "")[:100])
+
+        try:
+            attachments = list_message_attachments(token, msg_id)
+        except Exception as e:
+            logger.exception("❌ Failed to list attachments for message %s: %s", msg_id, e)
+            record_failure(msg_id, "", str(e), "list_attachments")
+            continue
+
+        if not attachments:
+            logger.info("📭 No attachments found for message %s — marking as processed", msg_id)
+            mark_message_processed(msg_id)
+            continue
 
         for att in attachments:
             try:
-                content_type = att.get("contentType", "").lower()
-                filename = att.get("name") or "invoice.pdf"
+                attachment_id = att.get("id") or att.get("attachmentId")
+                filename = att.get("name") or att.get("displayName") or "attachment.pdf"
+                content_type = (att.get("contentType") or "").lower()
 
-                # Only process PDF attachments
+                # Process only PDFs
                 if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
-                    logger.info("Skipping non-PDF attachment: %s (type=%s)", filename, content_type)
+                    logger.info("Skipping non-PDF attachment: %s (%s)", filename, content_type)
                     continue
 
-                attachment_id = att.get("id") or att.get("attachmentId") or "unknown-att"
-                safe_name = filename.replace(" ", "_").replace("/", "_")
-                blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
-
-                content_b64 = att.get("contentBytes")
-                if not content_b64:
-                    logger.warning("Attachment %s in message %s has no contentBytes; skipping", attachment_id, msg_id)
-                    continue
-
-                # --- Decode base64 into real PDF bytes ---
+                logger.info("📥 Downloading attachment %s (%s)", attachment_id, filename)
                 try:
-                    file_bytes = base64.b64decode(content_b64)
+                    file_bytes = download_attachment_bytes(token, msg_id, attachment_id)
                 except Exception as e:
-                    logger.error("❌ Failed to decode attachment %s in message %s: %s", attachment_id, msg_id, e)
+                    record_failure(msg_id, attachment_id, str(e), "download_attachment")
                     continue
 
-                # --- Upload to Azure Blob (binary bytes, not Base64) ---
+                blob_name = f"{msg_id}_{attachment_id}_{filename.replace(' ', '_')}"
                 try:
-                    logger.info("☁️ Uploading blob: %s", blob_name)
                     blob_url = upload_pdf_blob(blob_name, file_bytes)
-                    logger.info("✅ Uploaded successfully: %s", blob_url)
+                    logger.info("☁️ Uploaded blob: %s", blob_name)
                 except Exception as e:
-                    logger.exception("Blob upload failed for %s (msg=%s): %s", blob_name, msg_id, e)
+                    record_failure(msg_id, attachment_id, str(e), "upload_blob")
                     continue
 
-                # --- Analyze + Store via Azure AI ---
                 try:
-                    logger.info("🧠 Analyzing invoice for %s...", filename)
-                    result = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
-                    if result:
-                        safe_result = sanitize_for_mongo(result)
-                        processed_docs.append(safe_result.get("_id") or safe_result)
-                        logger.info("🧾 Stored invoice successfully: %s", safe_result.get("_id"))
+                    doc_id = analyze_and_store(blob_url, file_bytes, msg_id, attachment_id)
+                    if doc_id:
+                        processed_docs.append(doc_id)
+                        logger.info("✅ Stored invoice doc_id=%s (msg=%s att=%s)", doc_id, msg_id, attachment_id)
                     else:
-                        logger.warning("⚠️ No result returned for %s", filename)
+                        record_failure(msg_id, attachment_id, "analyze_and_store returned None", "form_recognizer")
                 except Exception as e:
-                    logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
+                    record_failure(msg_id, attachment_id, str(e), "form_recognizer")
                     continue
 
             except Exception as e:
-                logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
+                logger.exception("💥 Unexpected error processing attachment in msg %s: %s", msg_id, e)
+                record_failure(msg_id, att.get("id", ""), str(e), "processing")
                 continue
 
-    logger.info("✅ Completed processing %d message(s); %d stored document(s)", msg_count, len(processed_docs))
+        # After all attachments are handled (success or fail), mark message processed
+        try:
+            mark_message_processed(msg_id)
+        except Exception as e:
+            logger.exception("⚠️ Could not mark message %s processed: %s", msg_id, e)
+
+    logger.info("✅ Email check cycle complete. %d new documents stored.", len(processed_docs))
     return processed_docs
 
-# ---------------------------------------------------------------------
-# Optional: continuous monitor
-# ---------------------------------------------------------------------
-def run_forever(interval_seconds: int = 180):
-    """Continuously check inbox every few minutes."""
-    logger.info("🔁 Starting continuous invoice monitor (interval=%ss)...", interval_seconds)
-    while True:
-        try:
-            token = get_graph_token()
-            if token:
-                check_emails(token)
-            else:
-                logger.error("No Graph token retrieved this cycle.")
-        except Exception as e:
-            logger.exception("Fatal error in monitor loop: %s", e)
-        time.sleep(interval_seconds)
 
-# ---------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------
-if __name__ == "__main__":
+def get_graph_token_safe():
+    """Obtain Graph token safely for background thread use."""
     try:
-        token = get_graph_token()
-        if not token:
-            print("Could not obtain Graph token.")
-        else:
-            print("Token acquired. Running one-time email check...")
-            results = check_emails(token)
-            print(f"Processed {len(results)} document(s):", results)
+        return get_graph_token()
     except Exception as e:
-        print("Startup failed:", e)
+        logger.exception("❌ Could not obtain Graph token: %s", e)
+        return None
+
+
+# Manual testing entry point
+if __name__ == "__main__":
+    token = get_graph_token_safe()
+    if not token:
+        logger.error("No Graph token available for manual run.")
+    else:
+        check_emails(token, top=50)
