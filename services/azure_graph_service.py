@@ -11,21 +11,30 @@ Handles all interactions with Microsoft Graph API:
 
 import os
 import requests
-from datetime import datetime
 from services.logger_utils import logger, with_retry
 
 # -----------------------------------------------------
 # Config
 # -----------------------------------------------------
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+
+# These match your .env exactly
 TENANT_ID = os.getenv("GRAPH_TENANT_ID")
 CLIENT_ID = os.getenv("GRAPH_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET")
-USER_EMAIL = os.getenv("TARGET_USER_EMAIL")  # mailbox to read invoices from
+USER_EMAIL = os.getenv("TARGET_USER_EMAIL")
+
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 
+# Log warnings if any critical envs are missing
+if not TENANT_ID:
+    logger.error("❌ GRAPH_TENANT_ID not set in environment.")
+if not CLIENT_ID:
+    logger.error("❌ GRAPH_CLIENT_ID not set in environment.")
+if not CLIENT_SECRET:
+    logger.error("❌ GRAPH_CLIENT_SECRET not set in environment.")
 if not USER_EMAIL:
-    logger.warning("⚠️ TARGET_EMAIL not set in environment — Graph calls will fail.")
+    logger.warning("⚠️ TARGET_USER_EMAIL not set in environment — Graph calls will fail.")
 
 
 # -----------------------------------------------------
@@ -37,6 +46,17 @@ def get_graph_token() -> str:
     Authenticate to Microsoft Graph using client credentials.
     Returns an access token string.
     """
+    if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET]):
+        raise RuntimeError(
+            f"Missing required credentials: "
+            f"TENANT_ID={TENANT_ID}, CLIENT_ID={CLIENT_ID}, CLIENT_SECRET={'set' if CLIENT_SECRET else 'missing'}"
+        )
+
+    logger.info(
+        f"🔐 Requesting Graph token with Tenant={TENANT_ID}, "
+        f"Client={CLIENT_ID[:6]}..., Secret={'set' if CLIENT_SECRET else 'missing'}"
+    )
+
     url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
     data = {
         "client_id": CLIENT_ID,
@@ -51,6 +71,8 @@ def get_graph_token() -> str:
         resp.raise_for_status()
 
     token = resp.json().get("access_token")
+    if not token:
+        raise RuntimeError("Failed to parse access_token from Graph response.")
     logger.info("🔑 Obtained Microsoft Graph access token.")
     return token
 
@@ -68,7 +90,6 @@ def fetch_new_messages(token: str, top: int = 10):
         "Accept": "application/json"
     }
 
-    # Get recent messages (ordered descending)
     url = (
         f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages"
         f"?$top={top}&$select=id,subject,receivedDateTime,hasAttachments"
@@ -99,6 +120,7 @@ def list_message_attachments(token: str, message_id: str):
     """
     headers = {"Authorization": f"Bearer {token}"}
     url = f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages/{message_id}/attachments?$top=50"
+
     resp = requests.get(url, headers=headers, timeout=30)
     if resp.status_code != 200:
         logger.error(f"❌ list_message_attachments failed: {resp.status_code} {resp.text}")
@@ -133,7 +155,7 @@ def download_attachment_bytes(token: str, message_id: str, attachment_id: str) -
 
 
 # -----------------------------------------------------
-# Utility for testing manually
+# Manual test entrypoint
 # -----------------------------------------------------
 if __name__ == "__main__":
     logger.info("🔍 Testing Microsoft Graph connectivity...")
