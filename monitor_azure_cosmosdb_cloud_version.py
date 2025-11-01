@@ -19,6 +19,7 @@ import traceback
 from datetime import datetime
 from services.logger_utils import logger, with_retry
 from services import azure_blob_service, cosmos_service
+from services.cosmos_service import get_db_collections
 
 # ✅ Import Graph functions explicitly for full compatibility
 from services.azure_graph_service import (
@@ -39,15 +40,25 @@ COLS = None
 
 
 def _get_cols():
-    """Return Mongo collection handles (cached)."""
-    global COLS
-    if COLS:
-        return COLS
-    cols = cosmos_service.get_db_collections()
-    if not cols.get("processed"):
-        cols["processed"] = cols.get("processed_attachments") or cols.get("processed")
-    COLS = cols
-    return COLS
+    """
+    Safely get MongoDB collections.
+    Explicitly checks for None instead of using boolean testing,
+    to avoid PyMongo NotImplementedError.
+    """
+    cols = get_db_collections()
+
+    if not isinstance(cols, dict):
+        raise ValueError("get_db_collections() must return a dict of collections.")
+
+    required = ["invoices", "processed", "meta"]
+    for key in required:
+        val = cols.get(key)
+        if val is None:
+            raise ValueError(f"Missing Mongo collection: {key}")
+        # Log collection connection info
+        logger.info(f"✅ Connected to Mongo collection: {key}")
+
+    return cols
 
 
 def _is_pdf_attachment(att: dict) -> bool:
