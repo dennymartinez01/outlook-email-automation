@@ -24,6 +24,7 @@ USER_EMAIL = os.getenv("TARGET_USER_EMAIL")
 
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 
+
 # Early warnings
 if not TENANT_ID:
     logger.error("❌ GRAPH_TENANT_ID not set in environment.")
