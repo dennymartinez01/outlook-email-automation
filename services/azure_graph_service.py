@@ -1,24 +1,22 @@
 """
 services/azure_graph_service.py
 ---------------------------------------------------------
-Handles all interactions with Microsoft Graph API:
- - Auth (OAuth2 client credentials)
- - Fetching recent messages
- - Listing message attachments
- - Downloading attachment bytes via /$value endpoint
+Microsoft Graph helpers (auth + message listing + attachments)
+- Uses GRAPH_* env var names (matching your .env)
+- fetch_new_messages returns recent messages (metadata)
+- list_message_attachments returns attachment metadata
+- download_attachment_bytes streams binary bytes for an attachment
 ---------------------------------------------------------
 """
 
 import os
 import requests
+from datetime import datetime, timedelta
 from services.logger_utils import logger, with_retry
 
-# -----------------------------------------------------
-# Config
-# -----------------------------------------------------
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
-# These match your .env exactly
+# Expecting GRAPH_* names in your .env
 TENANT_ID = os.getenv("GRAPH_TENANT_ID")
 CLIENT_ID = os.getenv("GRAPH_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET")
@@ -26,7 +24,7 @@ USER_EMAIL = os.getenv("TARGET_USER_EMAIL")
 
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 
-# Log warnings if any critical envs are missing
+# Early warnings
 if not TENANT_ID:
     logger.error("❌ GRAPH_TENANT_ID not set in environment.")
 if not CLIENT_ID:
@@ -37,26 +35,15 @@ if not USER_EMAIL:
     logger.warning("⚠️ TARGET_USER_EMAIL not set in environment — Graph calls will fail.")
 
 
-# -----------------------------------------------------
-# Auth: Get access token
-# -----------------------------------------------------
 @with_retry(max_attempts=3, base_delay=2)
 def get_graph_token() -> str:
     """
-    Authenticate to Microsoft Graph using client credentials.
-    Returns an access token string.
+    Acquire client_credentials token for Microsoft Graph.
     """
     if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET]):
-        raise RuntimeError(
-            f"Missing required credentials: "
-            f"TENANT_ID={TENANT_ID}, CLIENT_ID={CLIENT_ID}, CLIENT_SECRET={'set' if CLIENT_SECRET else 'missing'}"
-        )
+        raise RuntimeError("Missing GRAPH_TENANT_ID/GRAPH_CLIENT_ID/GRAPH_CLIENT_SECRET environment values.")
 
-    logger.info(
-        f"🔐 Requesting Graph token with Tenant={TENANT_ID}, "
-        f"Client={CLIENT_ID[:6]}..., Secret={'set' if CLIENT_SECRET else 'missing'}"
-    )
-
+    logger.info(f"🔐 Requesting Graph token with Tenant={TENANT_ID}, Client={CLIENT_ID[:8]}..., Secret={'set' if CLIENT_SECRET else 'missing'}")
     url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
     data = {
         "client_id": CLIENT_ID,
@@ -64,7 +51,6 @@ def get_graph_token() -> str:
         "scope": GRAPH_SCOPE,
         "grant_type": "client_credentials"
     }
-
     resp = requests.post(url, data=data, timeout=30)
     if resp.status_code != 200:
         logger.error(f"❌ Failed to acquire Graph token: {resp.status_code} {resp.text}")
@@ -77,26 +63,24 @@ def get_graph_token() -> str:
     return token
 
 
-# -----------------------------------------------------
-# Fetch messages (metadata only, no attachments)
-# -----------------------------------------------------
 @with_retry(max_attempts=3, base_delay=2)
-def fetch_new_messages(token: str, top: int = 10):
+def fetch_new_messages(token: str, top: int = 50, days_back: int = 3):
     """
-    Fetch recent messages (metadata only) from the configured mailbox.
+    Fetch recent messages across the mailbox. Default: last `days_back` days, up to `top` messages.
+    Returns list of message dicts (id, subject, receivedDateTime, hasAttachments, parentFolderId, etc.)
     """
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
-    }
-
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    date_filter = (datetime.utcnow() - timedelta(days=days_back)).replace(microsecond=0).isoformat() + "Z"
+    # Select core fields and order by receivedDateTime desc, fetch up to `top`
     url = (
         f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages"
-        f"?$top={top}&$select=id,subject,receivedDateTime,hasAttachments"
+        f"?$filter=receivedDateTime ge {date_filter}"
         f"&$orderby=receivedDateTime desc"
+        f"&$select=id,subject,receivedDateTime,hasAttachments,conversationId,parentFolderId,isRead"
+        f"&$top={top}"
     )
 
-    logger.info(f"📨 Fetching up to {top} recent messages from {USER_EMAIL}")
+    logger.info(f"📨 Fetching up to {top} messages since {date_filter} from {USER_EMAIL}")
     resp = requests.get(url, headers=headers, timeout=30)
     if resp.status_code != 200:
         logger.error(f"❌ Failed to fetch messages: {resp.status_code} {resp.text}")
@@ -108,70 +92,50 @@ def fetch_new_messages(token: str, top: int = 10):
     return messages
 
 
-# -----------------------------------------------------
-# List attachments metadata for a message
-# -----------------------------------------------------
 @with_retry(max_attempts=3, base_delay=2)
 def list_message_attachments(token: str, message_id: str):
     """
-    Returns metadata for all attachments of a specific message.
-    Example response:
-      [{ "id": "...", "name": "invoice.pdf", "contentType": "application/pdf" }, ...]
+    Returns metadata for attachments of a message.
     """
     headers = {"Authorization": f"Bearer {token}"}
     url = f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages/{message_id}/attachments?$top=50"
-
     resp = requests.get(url, headers=headers, timeout=30)
     if resp.status_code != 200:
-        logger.error(f"❌ list_message_attachments failed: {resp.status_code} {resp.text}")
+        logger.error(f"❌ list_message_attachments failed ({message_id}): {resp.status_code} {resp.text}")
         resp.raise_for_status()
-
     data = resp.json()
     attachments = data.get("value", [])
     logger.info(f"📎 Found {len(attachments)} attachments for message {message_id}")
     return attachments
 
 
-# -----------------------------------------------------
-# Download attachment binary content via /$value
-# -----------------------------------------------------
 @with_retry(max_attempts=3, base_delay=2)
 def download_attachment_bytes(token: str, message_id: str, attachment_id: str) -> bytes:
     """
-    Downloads the binary contents of an attachment via Graph API /$value endpoint.
-    Returns raw bytes suitable for upload to Azure Blob.
+    Download binary attachment via /$value endpoint (best for file attachments).
     """
     headers = {"Authorization": f"Bearer {token}"}
     url = f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages/{message_id}/attachments/{attachment_id}/$value"
-
     logger.info(f"⬇️ Downloading attachment bytes for msg={message_id}, att={attachment_id}")
     resp = requests.get(url, headers=headers, stream=True, timeout=60)
-
     if resp.status_code != 200:
-        logger.error(f"❌ download_attachment_bytes failed: {resp.status_code} {resp.text}")
+        logger.error(f"❌ download_attachment_bytes failed ({attachment_id}): {resp.status_code} {resp.text}")
         resp.raise_for_status()
-
     return resp.content
 
 
-# -----------------------------------------------------
-# Manual test entrypoint
-# -----------------------------------------------------
+# quick manual test helper when run standalone
 if __name__ == "__main__":
-    logger.info("🔍 Testing Microsoft Graph connectivity...")
+    logger.info("🔍 Testing Graph connectivity...")
     token = get_graph_token()
-    msgs = fetch_new_messages(token, top=5)
-    if not msgs:
-        logger.warning("No messages found.")
-    else:
-        first_msg = msgs[0]
-        mid = first_msg["id"]
-        logger.info(f"Message subject: {first_msg.get('subject')}")
-        attachments = list_message_attachments(token, mid)
-        if attachments:
-            first_att = attachments[0]
-            logger.info(f"First attachment: {first_att.get('name')}")
-            content = download_attachment_bytes(token, mid, first_att["id"])
-            logger.info(f"Downloaded {len(content)} bytes for attachment {first_att['id']}")
-        else:
-            logger.info("No attachments found.")
+    msgs = fetch_new_messages(token, top=10, days_back=3)
+    for m in msgs:
+        logger.info(f"MSG: {m.get('subject')} | {m.get('receivedDateTime')} | id={m.get('id')}")
+    if msgs:
+        mid = msgs[0]["id"]
+        atts = list_message_attachments(token, mid)
+        if atts:
+            att = atts[0]
+            logger.info(f"First att: {att.get('name')} / {att.get('contentType')}")
+            content = download_attachment_bytes(token, mid, att["id"])
+            logger.info(f"Downloaded {len(content)} bytes")

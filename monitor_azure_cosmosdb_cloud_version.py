@@ -1,21 +1,26 @@
-# monitor_azure_cosmosdb_cloud_version.py
 """
-Monitors Outlook mailbox for invoice PDFs:
- - Fetches new messages via Microsoft Graph
- - Skips messages already processed (Mongo 'processed_attachments')
- - Downloads PDF attachments via Graph /$value
- - Uploads to Azure Blob (inline-displayed PDFs)
- - Analyzes invoices using Azure Form Recognizer
- - Stores results in MongoDB ('invoicecollection')
- - Records success/failure status in 'processed_attachments'
+monitor_azure_cosmosdb_cloud_version.py
+---------------------------------------------------------
+Background monitor for reading emails, downloading PDF attachments,
+uploading to Azure Blob, optionally sending to Form Recognizer,
+and recording results to MongoDB (processed_attachments + invoicecollection).
+
+Key features:
+ - Imports Graph service functions directly (for compatibility with previous builds)
+ - Resilient retry handling and clear logging
+ - Focused-folder safe: fetches recent messages (last 3 days)
+ - Reprocesses messages with status == "failed"
+ - Tracks success/failure in processed_attachments collection
+---------------------------------------------------------
 """
 
-from typing import List
-from services.logger_utils import logger
-from services.checkpoint_service import mark_message_processed, is_message_processed
-from services.failure_service import record_failure
-from services.azure_blob_service import upload_pdf_blob
-from services.azure_ai_service import analyze_and_store
+import os
+import traceback
+from datetime import datetime
+from services.logger_utils import logger, with_retry
+from services import azure_blob_service, cosmos_service
+
+# ✅ Import Graph functions explicitly for full compatibility
 from services.azure_graph_service import (
     get_graph_token,
     fetch_new_messages,
@@ -23,116 +28,273 @@ from services.azure_graph_service import (
     download_attachment_bytes,
 )
 
+# Optional AI analyzer (if available)
+try:
+    from services import azure_ai_service
+except Exception:
+    azure_ai_service = None
 
-def check_emails(token: str, top: int = 50) -> List[str]:
-    """
-    Fetch new messages and process PDF attachments.
-    Returns list of processed document IDs (from analyze_and_store).
-    """
-    processed_docs: List[str] = []
+# Cache for DB collections
+COLS = None
 
+
+def _get_cols():
+    """Return Mongo collection handles (cached)."""
+    global COLS
+    if COLS:
+        return COLS
+    cols = cosmos_service.get_db_collections()
+    if not cols.get("processed"):
+        cols["processed"] = cols.get("processed_attachments") or cols.get("processed")
+    COLS = cols
+    return COLS
+
+
+def _is_pdf_attachment(att: dict) -> bool:
+    """Detect whether an attachment is PDF based on contentType or filename."""
+    ctype = (att.get("contentType") or "").lower()
+    name = (att.get("name") or "").lower()
+    return "pdf" in ctype or name.endswith(".pdf")
+
+
+@with_retry(max_attempts=3, base_delay=2)
+def check_emails(token: str):
+    """Fetch messages, download new/failed PDFs, upload, analyze, and persist."""
     if not token:
-        logger.error("❌ No Graph token provided to check_emails()")
-        return processed_docs
+        logger.error("❌ No Graph token provided to check_emails.")
+        return 0
 
+    cols = _get_cols()
+    processed_col = cols["processed"]
+    invoices_col = cols["invoices"]
+
+    new_docs = 0
     try:
-        messages = fetch_new_messages(token, top=top)
-    except Exception as e:
-        logger.exception("❌ Failed to fetch messages from Graph: %s", e)
-        return processed_docs
+        messages = fetch_new_messages(token, top=50, days_back=3)
+    except Exception:
+        logger.exception("❌ Failed fetching messages from Graph.")
+        return 0
 
-    logger.info("📬 Retrieved %d messages from Graph.", len(messages or []))
+    logger.info(f"📬 Retrieved {len(messages)} messages from Graph.")
 
-    for msg in messages or []:
-        msg_id = msg.get("id") or msg.get("messageId")
-        if not msg_id:
-            logger.warning("⚠️ Skipping message with no id: %s", msg)
-            continue
-
-        # Skip if message already processed successfully
-        if is_message_processed(msg_id):
-            logger.info("⏩ Skipping already processed message %s", msg_id)
-            continue
-
-        logger.info("🔍 Processing message %s (%s)", msg_id, msg.get("subject", "")[:100])
+    for msg in messages:
+        msg_id = msg.get("id")
+        subject = msg.get("subject", "<no subject>")
+        received = msg.get("receivedDateTime")
+        folder = msg.get("parentFolderId", "")
+        is_read = msg.get("isRead", False)
 
         try:
-            attachments = list_message_attachments(token, msg_id)
-        except Exception as e:
-            logger.exception("❌ Failed to list attachments for message %s: %s", msg_id, e)
-            record_failure(msg_id, "", str(e), "list_attachments")
-            continue
+            logger.info(
+                f"📧 Message found: subject={subject!r} id={msg_id} folder={folder} isRead={is_read}"
+            )
 
-        if not attachments:
-            logger.info("📭 No attachments found for message %s — marking as processed", msg_id)
-            mark_message_processed(msg_id)
-            continue
+            existing = processed_col.find_one({"message_id": msg_id})
+            if existing and existing.get("status") == "success":
+                logger.info(f"⏩ Skipping already processed message {msg_id}")
+                continue
+            elif existing and existing.get("status") == "failed":
+                logger.info(f"♻️ Reprocessing previously failed message {msg_id}")
+            else:
+                logger.info(f"🆕 New message to process: {msg_id}")
 
-        for att in attachments:
+            # Get attachments
             try:
-                attachment_id = att.get("id") or att.get("attachmentId")
-                filename = att.get("name") or att.get("displayName") or "attachment.pdf"
-                content_type = (att.get("contentType") or "").lower()
-
-                # Process only PDFs
-                if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
-                    logger.info("Skipping non-PDF attachment: %s (%s)", filename, content_type)
-                    continue
-
-                logger.info("📥 Downloading attachment %s (%s)", attachment_id, filename)
-                try:
-                    file_bytes = download_attachment_bytes(token, msg_id, attachment_id)
-                except Exception as e:
-                    record_failure(msg_id, attachment_id, str(e), "download_attachment")
-                    continue
-
-                blob_name = f"{msg_id}_{attachment_id}_{filename.replace(' ', '_')}"
-                try:
-                    blob_url = upload_pdf_blob(blob_name, file_bytes)
-                    logger.info("☁️ Uploaded blob: %s", blob_name)
-                except Exception as e:
-                    record_failure(msg_id, attachment_id, str(e), "upload_blob")
-                    continue
-
-                try:
-                    doc_id = analyze_and_store(blob_url, file_bytes, msg_id, attachment_id)
-                    if doc_id:
-                        processed_docs.append(doc_id)
-                        logger.info("✅ Stored invoice doc_id=%s (msg=%s att=%s)", doc_id, msg_id, attachment_id)
-                    else:
-                        record_failure(msg_id, attachment_id, "analyze_and_store returned None", "form_recognizer")
-                except Exception as e:
-                    record_failure(msg_id, attachment_id, str(e), "form_recognizer")
-                    continue
-
+                attachments = list_message_attachments(token, msg_id)
             except Exception as e:
-                logger.exception("💥 Unexpected error processing attachment in msg %s: %s", msg_id, e)
-                record_failure(msg_id, att.get("id", ""), str(e), "processing")
+                logger.exception(f"❌ Failed to list attachments for {msg_id}")
+                processed_col.update_one(
+                    {"message_id": msg_id},
+                    {
+                        "$set": {
+                            "message_subject": subject,
+                            "status": "failed",
+                            "error": f"list_attachments_failed: {e}",
+                            "processed_at": datetime.utcnow(),
+                        }
+                    },
+                    upsert=True,
+                )
                 continue
 
-        # After all attachments are handled (success or fail), mark message processed
-        try:
-            mark_message_processed(msg_id)
+            pdf_found = False
+            for att in attachments:
+                if not _is_pdf_attachment(att):
+                    logger.info(
+                        f"📎 Skipping non-PDF attachment: {att.get('name')} ({att.get('contentType')})"
+                    )
+                    continue
+
+                pdf_found = True
+                att_id = att["id"]
+                att_name = att.get("name") or f"{msg_id}_{att_id}.pdf"
+                logger.info(f"📎 PDF detected: {att_name} — downloading...")
+
+                # Download
+                try:
+                    content_bytes = download_attachment_bytes(token, msg_id, att_id)
+                except Exception as e:
+                    logger.exception(f"❌ Failed to download {att_name}")
+                    processed_col.update_one(
+                        {"message_id": msg_id},
+                        {
+                            "$set": {
+                                "message_subject": subject,
+                                "status": "failed",
+                                "error": f"download_failed: {e}",
+                                "processed_at": datetime.utcnow(),
+                            }
+                        },
+                        upsert=True,
+                    )
+                    continue
+
+                # Upload
+                try:
+                    blob_url = azure_blob_service.upload_pdf_blob(att_name, content_bytes)
+                    logger.info(f"📤 Uploaded to Blob: {blob_url}")
+                except Exception as e:
+                    logger.exception(f"❌ Failed to upload {att_name}")
+                    processed_col.update_one(
+                        {"message_id": msg_id},
+                        {
+                            "$set": {
+                                "message_subject": subject,
+                                "status": "failed",
+                                "error": f"blob_upload_failed: {e}",
+                                "processed_at": datetime.utcnow(),
+                            }
+                        },
+                        upsert=True,
+                    )
+                    continue
+
+                # Analyze via AI (if available)
+                invoice_data = {}
+                if azure_ai_service:
+                    ai_func = None
+                    for fn in (
+                        "analyze_invoice_bytes",
+                        "analyze_document_bytes",
+                        "analyze_bytes",
+                        "analyze_invoice",
+                    ):
+                        if hasattr(azure_ai_service, fn):
+                            ai_func = getattr(azure_ai_service, fn)
+                            break
+                    if ai_func:
+                        try:
+                            logger.info(f"🤖 Analyzing {att_name} via Azure AI...")
+                            invoice_data = ai_func(content_bytes)
+                            logger.info(f"🤖 AI analysis completed for {att_name}")
+                        except Exception as e:
+                            logger.exception("⚠️ Azure AI analysis failed")
+                            processed_col.update_one(
+                                {"message_id": msg_id},
+                                {
+                                    "$set": {
+                                        "message_subject": subject,
+                                        "status": "failed",
+                                        "error": f"form_recognizer_failed: {e}",
+                                        "processed_at": datetime.utcnow(),
+                                    }
+                                },
+                                upsert=True,
+                            )
+                            continue
+                    else:
+                        logger.info("ℹ️ azure_ai_service found but no supported analysis function.")
+                else:
+                    logger.info("ℹ️ Azure AI service not configured, skipping analysis.")
+
+                # Insert invoice doc
+                invoice_doc = {
+                    "message_id": msg_id,
+                    "message_subject": subject,
+                    "received_at": received,
+                    "attachment_id": att_id,
+                    "attachment_name": att_name,
+                    "pdf_file": blob_url,
+                    "invoice_data": invoice_data or {},
+                    "status": "success",
+                    "processed_at": datetime.utcnow(),
+                }
+
+                try:
+                    invoices_col.insert_one(invoice_doc)
+                    new_docs += 1
+                    logger.info(f"💾 Stored invoice {att_name} in DB.")
+                except Exception as e:
+                    logger.exception("❌ Failed to insert invoice document")
+                    processed_col.update_one(
+                        {"message_id": msg_id},
+                        {
+                            "$set": {
+                                "message_subject": subject,
+                                "status": "failed",
+                                "error": f"db_insert_failed: {e}",
+                                "processed_at": datetime.utcnow(),
+                            }
+                        },
+                        upsert=True,
+                    )
+                    continue
+
+                processed_col.update_one(
+                    {"message_id": msg_id},
+                    {
+                        "$set": {
+                            "message_subject": subject,
+                            "status": "success",
+                            "attachment_id": att_id,
+                            "attachment_name": att_name,
+                            "pdf_file": blob_url,
+                            "processed_at": datetime.utcnow(),
+                        }
+                    },
+                    upsert=True,
+                )
+
+            if not pdf_found:
+                logger.info(f"⚠️ No PDF attachments found for {msg_id}")
+                processed_col.update_one(
+                    {"message_id": msg_id},
+                    {
+                        "$set": {
+                            "message_subject": subject,
+                            "status": "failed",
+                            "error": "no_pdf_attachments",
+                            "processed_at": datetime.utcnow(),
+                        }
+                    },
+                    upsert=True,
+                )
+
         except Exception as e:
-            logger.exception("⚠️ Could not mark message %s processed: %s", msg_id, e)
+            logger.exception(f"❌ Unexpected error while processing {msg_id}")
+            processed_col.update_one(
+                {"message_id": msg_id},
+                {
+                    "$set": {
+                        "message_subject": subject,
+                        "status": "failed",
+                        "error": f"unexpected_exception: {e}",
+                        "traceback": traceback.format_exc(),
+                        "processed_at": datetime.utcnow(),
+                    }
+                },
+                upsert=True,
+            )
 
-    logger.info("✅ Email check cycle complete. %d new documents stored.", len(processed_docs))
-    return processed_docs
+    logger.info(f"✅ Email check complete. {new_docs} new documents stored.")
+    return new_docs
 
 
-def get_graph_token_safe():
-    """Obtain Graph token safely for background thread use."""
-    try:
-        return get_graph_token()
-    except Exception as e:
-        logger.exception("❌ Could not obtain Graph token: %s", e)
-        return None
-
-
-# Manual testing entry point
+# Manual debug entrypoint
 if __name__ == "__main__":
-    token = get_graph_token_safe()
-    if not token:
-        logger.error("No Graph token available for manual run.")
-    else:
-        check_emails(token, top=50)
+    logger.info("🔍 Running manual email check (local test)")
+    try:
+        token = get_graph_token()
+        check_emails(token)
+    except Exception:
+        logger.exception("❌ Manual run failed")
