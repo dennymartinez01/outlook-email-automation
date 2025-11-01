@@ -18,10 +18,10 @@ from services.logger_utils import logger, with_retry
 # Config
 # -----------------------------------------------------
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
-TENANT_ID = os.getenv("AZURE_TENANT_ID")
-CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
-CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
-USER_EMAIL = os.getenv("TARGET_EMAIL")  # mailbox to read invoices from
+TENANT_ID = os.getenv("GRAPH_TENANT_ID")
+CLIENT_ID = os.getenv("GRAPH_CLIENT_ID")
+CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET")
+USER_EMAIL = os.getenv("TARGET_USER_EMAIL")  # mailbox to read invoices from
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
 
 if not USER_EMAIL:
