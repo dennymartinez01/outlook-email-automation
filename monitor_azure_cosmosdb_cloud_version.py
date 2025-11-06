@@ -20,6 +20,7 @@ from datetime import datetime
 from services.logger_utils import logger, with_retry
 from services import azure_blob_service, cosmos_service
 from services.cosmos_service import get_db_collections
+import pymongo
 
 # ✅ Import Graph functions explicitly for full compatibility
 from services.azure_graph_service import (
@@ -231,10 +232,29 @@ def check_emails(token: str):
                     "processed_at": datetime.utcnow(),
                 }
 
+                import pymongo  # ✅ Add this import near the top if not already present
+
                 try:
                     invoices_col.insert_one(invoice_doc)
                     new_docs += 1
                     logger.info(f"💾 Stored invoice {att_name} in DB.")
+                except pymongo.errors.DuplicateKeyError:
+                    logger.warning(
+                        f"⚠️ Duplicate invoice detected — skipping insert for {invoice_doc.get('attachment_name') or att_name}"
+                    )
+                    processed_col.update_one(
+                        {"message_id": msg_id},
+                        {
+                            "$set": {
+                                "message_subject": subject,
+                                "status": "duplicate",
+                                "error": "duplicate_invoice_skipped",
+                                "processed_at": datetime.utcnow(),
+                            }
+                        },
+                        upsert=True,
+                    )
+                    continue
                 except Exception as e:
                     logger.exception("❌ Failed to insert invoice document")
                     processed_col.update_one(
