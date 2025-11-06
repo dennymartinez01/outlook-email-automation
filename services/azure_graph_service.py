@@ -1,142 +1,96 @@
-"""
-services/azure_graph_service.py
----------------------------------------------------------
-Microsoft Graph helpers (auth + message listing + attachments)
-- Uses GRAPH_* env var names (matching your .env)
-- fetch_new_messages returns recent messages (metadata)
-- list_message_attachments returns attachment metadata
-- download_attachment_bytes streams binary bytes for an attachment
----------------------------------------------------------
-"""
-
 import os
+import json
 import requests
-from datetime import datetime, timedelta
+from pathlib import Path
+from dotenv import load_dotenv
 from services.logger_utils import logger, with_retry
+
+load_dotenv()
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
-# Expecting GRAPH_* names in your .env
-TENANT_ID = os.getenv("GRAPH_TENANT_ID")
-CLIENT_ID = os.getenv("GRAPH_CLIENT_ID")
-CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET")
-USER_EMAIL = os.getenv("TARGET_USER_EMAIL")
 
-GRAPH_SCOPE = "https://graph.microsoft.com/.default"
+@with_retry(max_attempts=3)
+def get_graph_token():
+    """Obtain Microsoft Graph API token using client credentials."""
+    tenant_id = os.getenv("GRAPH_TENANT_ID")
+    client_id = os.getenv("GRAPH_CLIENT_ID")
+    client_secret = os.getenv("GRAPH_CLIENT_SECRET")
 
+    if not tenant_id:
+        raise ValueError("GRAPH_TENANT_ID not configured in .env")
 
-# Early warnings
-if not TENANT_ID:
-    logger.error("❌ GRAPH_TENANT_ID not set in environment.")
-if not CLIENT_ID:
-    logger.error("❌ GRAPH_CLIENT_ID not set in environment.")
-if not CLIENT_SECRET:
-    logger.error("❌ GRAPH_CLIENT_SECRET not set in environment.")
-if not USER_EMAIL:
-    logger.warning("⚠️ TARGET_USER_EMAIL not set in environment — Graph calls will fail.")
-
-
-@with_retry(max_attempts=3, base_delay=2)
-def get_graph_token() -> str:
-    """
-    Acquire client_credentials token for Microsoft Graph.
-    """
-    if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET]):
-        raise RuntimeError("Missing GRAPH_TENANT_ID/GRAPH_CLIENT_ID/GRAPH_CLIENT_SECRET environment values.")
-
-    logger.info(f"🔐 Requesting Graph token with Tenant={TENANT_ID}, Client={CLIENT_ID[:8]}..., Secret={'set' if CLIENT_SECRET else 'missing'}")
-    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "scope": GRAPH_SCOPE,
-        "grant_type": "client_credentials"
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "scope": "https://graph.microsoft.com/.default",
     }
-    resp = requests.post(url, data=data, timeout=30)
-    if resp.status_code != 200:
-        logger.error(f"❌ Failed to acquire Graph token: {resp.status_code} {resp.text}")
-        resp.raise_for_status()
 
+    resp = requests.post(url, data=data)
+    resp.raise_for_status()
     token = resp.json().get("access_token")
-    if not token:
-        raise RuntimeError("Failed to parse access_token from Graph response.")
-    logger.info("🔑 Obtained Microsoft Graph access token.")
+
+    logger.info("✅ Microsoft Graph token acquired.")
     return token
 
 
-@with_retry(max_attempts=3, base_delay=2)
-def fetch_new_messages(token: str, top: int = 50, days_back: int = 3):
+@with_retry(max_attempts=3)
+def fetch_new_messages(token, top=10):
     """
-    Fetch recent messages across the mailbox. Default: last `days_back` days, up to `top` messages.
-    Returns list of message dicts (id, subject, receivedDateTime, hasAttachments, parentFolderId, etc.)
+    Fetch new messages (with attachments expanded) from the target inbox.
+
+    Uses last_processed.json as a checkpoint to avoid reprocessing.
+    Returns only messages that contain attachments (typically PDFs).
     """
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    date_filter = (datetime.utcnow() - timedelta(days=days_back)).replace(microsecond=0).isoformat() + "Z"
-    # Select core fields and order by receivedDateTime desc, fetch up to `top`
+    target_email = os.getenv("TARGET_USER_EMAIL")
+    if not target_email:
+        raise ValueError("TARGET_USER_EMAIL not configured in .env")
+
+    checkpoint_file = Path(__file__).resolve().parent.parent / "last_processed.json"
+    last_id = None
+    if checkpoint_file.exists():
+        try:
+            last_id = json.loads(checkpoint_file.read_text()).get("last_message_id")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to read checkpoint: {e}")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    # 🔑 Expand attachments so PDFs are included directly in the response
     url = (
-        f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages"
-        f"?$filter=receivedDateTime ge {date_filter}"
+        f"{GRAPH_BASE_URL}/users/{target_email}/mailFolders/inbox/messages"
+        f"?$top={top}"
         f"&$orderby=receivedDateTime desc"
-        f"&$select=id,subject,receivedDateTime,hasAttachments,conversationId,parentFolderId,isRead"
-        f"&$top={top}"
+        f"&$expand=attachments"
+        f"&$select=id,subject,receivedDateTime,hasAttachments"
     )
 
-    logger.info(f"📨 Fetching up to {top} messages since {date_filter} from {USER_EMAIL}")
     resp = requests.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        logger.error(f"❌ Failed to fetch messages: {resp.status_code} {resp.text}")
-        resp.raise_for_status()
+    resp.raise_for_status()
+    messages = resp.json().get("value", [])
+    logger.info(f"📬 Retrieved {len(messages)} new messages from Graph")
 
-    data = resp.json()
-    messages = data.get("value", [])
-    logger.info(f"✅ Retrieved {len(messages)} messages.")
-    return messages
+    new_messages = []
+    for msg in messages:
+        msg_id = msg.get("id")
+        if msg_id == last_id:
+            break  # stop once we reach last processed message
+        new_messages.append(msg)
 
+    if new_messages:
+        # Update checkpoint with the latest (most recent) message ID
+        checkpoint_file.write_text(json.dumps({"last_message_id": new_messages[0]["id"]}))
+        logger.info(f"💾 Updated checkpoint to message {new_messages[0]['id']}")
+    else:
+        logger.info("No new messages found since last checkpoint.")
 
-@with_retry(max_attempts=3, base_delay=2)
-def list_message_attachments(token: str, message_id: str):
-    """
-    Returns metadata for attachments of a message.
-    """
-    headers = {"Authorization": f"Bearer {token}"}
-    url = f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages/{message_id}/attachments?$top=50"
-    resp = requests.get(url, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        logger.error(f"❌ list_message_attachments failed ({message_id}): {resp.status_code} {resp.text}")
-        resp.raise_for_status()
-    data = resp.json()
-    attachments = data.get("value", [])
-    logger.info(f"📎 Found {len(attachments)} attachments for message {message_id}")
-    return attachments
+    # Filter messages with attachments
+    messages_with_attachments = [m for m in new_messages if m.get("attachments")]
+    logger.info(f"📎 Found {len(messages_with_attachments)} messages with attachments")
 
-
-@with_retry(max_attempts=3, base_delay=2)
-def download_attachment_bytes(token: str, message_id: str, attachment_id: str) -> bytes:
-    """
-    Download binary attachment via /$value endpoint (best for file attachments).
-    """
-    headers = {"Authorization": f"Bearer {token}"}
-    url = f"{GRAPH_BASE_URL}/users/{USER_EMAIL}/messages/{message_id}/attachments/{attachment_id}/$value"
-    logger.info(f"⬇️ Downloading attachment bytes for msg={message_id}, att={attachment_id}")
-    resp = requests.get(url, headers=headers, stream=True, timeout=60)
-    if resp.status_code != 200:
-        logger.error(f"❌ download_attachment_bytes failed ({attachment_id}): {resp.status_code} {resp.text}")
-        resp.raise_for_status()
-    return resp.content
-
-
-# quick manual test helper when run standalone
-if __name__ == "__main__":
-    logger.info("🔍 Testing Graph connectivity...")
-    token = get_graph_token()
-    msgs = fetch_new_messages(token, top=10, days_back=3)
-    for m in msgs:
-        logger.info(f"MSG: {m.get('subject')} | {m.get('receivedDateTime')} | id={m.get('id')}")
-    if msgs:
-        mid = msgs[0]["id"]
-        atts = list_message_attachments(token, mid)
-        if atts:
-            att = atts[0]
-            logger.info(f"First att: {att.get('name')} / {att.get('contentType')}")
-            content = download_attachment_bytes(token, mid, att["id"])
-            logger.info(f"Downloaded {len(content)} bytes")
+    return messages_with_attachments
