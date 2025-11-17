@@ -207,10 +207,10 @@
         html += formatRow('Vendor', inv.Supplier?.Name || '');
         html += formatRow('Customer', inv.Customer?.Name || '');
         html += formatRow('Currency', inv.Currency || '');
-        html += formatRow('Subtotal', (inv.SubTotal?.symbol || '') + (inv.SubTotal?.amount || ''));
-        html += formatRow('Tax', (inv.TaxAmount?.symbol || '') + (inv.TaxAmount?.amount || ''));
-        html += formatRow('Total', (inv.InvoiceTotal?.symbol || '') + (inv.InvoiceTotal?.amount || ''));
-        html += formatRow('Amount Due', (inv.AmountDue?.symbol || '') + (inv.AmountDue?.amount || ''));
+        html += formatRow('Subtotal', (inv.SubTotal.symbol || '') + (inv.SubTotal.amount || ''));
+        html += formatRow('Tax', (inv.TaxAmount.symbol || '') + (inv.TaxAmount.amount || ''));
+        html += formatRow('Total', (inv.InvoiceTotal.symbol || '') + (inv.InvoiceTotal.amount || ''));
+        html += formatRow('Amount Due', (inv.AmountDue.symbol || '') + (inv.AmountDue.amount || ''));
         html += `<tr><th>PDF</th><td><a href="${data.pdf_file || '#'}" target="_blank">Open PDF</a></td></tr>`;
 
         $('#invoiceDetailsTable').innerHTML = html;
