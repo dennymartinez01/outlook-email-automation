@@ -20,4 +20,4 @@ def record_failure(message_id: str, attachment_id: str, reason: str, stage: str)
         },
         upsert=True
     )
-    logger.error(f"❌ Failure recorded for {doc_id} at stage '{stage}': {reason}")
+    logger.error(f" Failure recorded for {doc_id} at stage '{stage}': {reason}")

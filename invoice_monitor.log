@@ -57,3 +57,476 @@
 2025-11-17 16:43:51,939 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc=)
 2025-11-17 16:43:53,481 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAABEgAQAM51GmtvWjZJkeHIAqjUxN4%3D_receipt_0.pdf
 2025-11-17 16:43:57,503 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAABEgAQAM51GmtvWjZJkeHIAqjUxN4=)
+2025-11-17 16:44:16,468 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc=
+2025-11-17 16:44:19,431 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4ozAAABEgAQAM51GmtvWjZJkeHIAqjUxN4=
+2025-11-17 16:44:20,495 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= (attachments=3) for category=nonstock
+2025-11-17 16:44:23,448 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAA= (attachments=2) for category=nonstock
+2025-11-17 16:44:24,518 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:44:27,468 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:44:28,541 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=_sample-invoice_(1).pdf
+2025-11-17 16:44:31,503 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAABEgAQANAigv9xFUNMmk_zzkyDJYk=_[_Invoice_1000438838].pdf
+2025-11-17 16:44:43,383 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4%3D_sample-invoice_%281%29.pdf
+2025-11-17 16:44:46,323 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAABEgAQANAigv9xFUNMmk_zzkyDJYk%3D_%5B_Invoice_1000438838%5D.pdf
+2025-11-17 16:44:47,396 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=)
+2025-11-17 16:44:50,359 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAABEgAQANAigv9xFUNMmk_zzkyDJYk=)
+2025-11-17 16:45:11,938 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=
+2025-11-17 16:45:14,539 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABNI4oyAAABEgAQANAigv9xFUNMmk_zzkyDJYk=
+2025-11-17 16:45:15,954 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=_sample-invoice_(1).pdf
+2025-11-17 16:45:18,559 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAA= (attachments=2) for category=nonstock
+2025-11-17 16:45:22,590 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:45:26,637 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAABEgAQAMmOvSpqXh1MnGzf4Gr_e3Y=_9597216_1.pdf
+2025-11-17 16:45:30,677 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs%3D_sample-invoice_%281%29.pdf
+2025-11-17 16:45:34,701 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=)
+2025-11-17 16:45:41,651 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAABEgAQAMmOvSpqXh1MnGzf4Gr_e3Y%3D_9597216_1.pdf
+2025-11-17 16:45:45,679 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAABEgAQAMmOvSpqXh1MnGzf4Gr_e3Y=)
+2025-11-17 16:45:59,282 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=
+2025-11-17 16:46:03,317 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA= (attachments=2) for category=nonstock
+2025-11-17 16:46:07,332 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:46:10,267 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-VAAABEgAQAMmOvSpqXh1MnGzf4Gr_e3Y=
+2025-11-17 16:46:11,372 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAABEgAQAPxfxi_t6uhHuJMNvXB3FpQ=_wordpress-pdf-invoice-plugin-sample.pdf
+2025-11-17 16:46:14,284 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA= (attachments=1) for category=nonstock
+2025-11-17 16:46:18,307 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc=_sample-invoice-1.pdf
+2025-11-17 16:46:25,196 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAABEgAQAPxfxi_t6uhHuJMNvXB3FpQ%3D_wordpress-pdf-invoice-plugin-sample.pdf
+2025-11-17 16:46:29,209 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAABEgAQAPxfxi_t6uhHuJMNvXB3FpQ=)
+2025-11-17 16:46:32,888 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc%3D_sample-invoice-1.pdf
+2025-11-17 16:46:36,898 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc=)
+2025-11-17 16:46:50,595 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAABEgAQAPxfxi_t6uhHuJMNvXB3FpQ=
+2025-11-17 16:46:54,604 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAA= (attachments=2) for category=nonstock
+2025-11-17 16:46:58,629 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:47:01,375 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-UAAABEgAQAKK9ZDawn7FBh8pOHw9kLKc=
+2025-11-17 16:47:02,663 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAABEgAQAP_8-qXtgRNKl8P5iQnytOM=_sample-invoice.pdf
+2025-11-17 16:47:05,396 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= (attachments=3) for category=nonstock
+2025-11-17 16:47:09,405 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:47:13,420 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=_sample-invoice_(1).pdf
+2025-11-17 16:47:17,292 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAABEgAQAP_8-qXtgRNKl8P5iQnytOM%3D_sample-invoice.pdf
+2025-11-17 16:47:21,316 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAABEgAQAP_8-qXtgRNKl8P5iQnytOM=)
+2025-11-17 16:47:27,994 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4%3D_sample-invoice_%281%29.pdf
+2025-11-17 16:47:32,005 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=)
+2025-11-17 16:47:45,905 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-RAAABEgAQAP_8-qXtgRNKl8P5iQnytOM=
+2025-11-17 16:47:49,926 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAA= (attachments=1) for category=nonstock
+2025-11-17 16:47:53,956 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAABEgAQACZOC6NY5YxOtYFe1J6IfTY=_Woodside_Distribution_Invoice_No._WD348568.pdf
+2025-11-17 16:47:56,505 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAO7uJzJYm3NImZHvhKfIjg4=
+2025-11-17 16:48:00,538 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=_sample-invoice_(1).pdf
+2025-11-17 16:48:08,581 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAABEgAQACZOC6NY5YxOtYFe1J6IfTY%3D_Woodside_Distribution_Invoice_No._WD348568.pdf
+2025-11-17 16:48:12,592 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAABEgAQACZOC6NY5YxOtYFe1J6IfTY=)
+2025-11-17 16:48:15,175 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs%3D_sample-invoice_%281%29.pdf
+2025-11-17 16:48:19,195 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=)
+2025-11-17 16:48:34,898 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABFoAcUAAABEgAQACZOC6NY5YxOtYFe1J6IfTY=
+2025-11-17 16:48:38,916 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAA= (attachments=2) for category=nonstock
+2025-11-17 16:48:42,936 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:48:43,684 [WARNING] analyze_and_store returned no id for msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-TAAABEgAQAHTucse5AKtGuADAHRjKfPs=
+2025-11-17 16:48:46,968 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAABEgAQAJjCpMANWxhBniTJMgEr1FM=_test3.pdf
+2025-11-17 16:48:47,713 [INFO] Processing message AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA= (attachments=2) for category=nonstock
+2025-11-17 16:48:51,745 [INFO] Skipping non-PDF attachment: We sent you safe versions of your files (type=message/rfc822)
+2025-11-17 16:48:55,774 [INFO] Uploading PDF to blob: AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAA=_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABGDs-SAAABEgAQAPxfxi_t6uhHuJMNvXB3FpQ=_wordpress-pdf-invoice-plugin-sample.pdf
+2025-11-17 16:49:01,533 [INFO] Uploaded blob -> https://roxorinvoicefiles.blob.core.windows.net/invoices/AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAA%3D_AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAABEgAQAJjCpMANWxhBniTJMgEr1FM%3D_test3.pdf
+2025-11-17 16:49:05,283 [INFO] Stopping background worker...
+2025-11-17 16:49:05,548 [INFO] Analyzing & storing invoice (msg=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAA= att=AAMkADlmOTRiYTQ0LTNlOTAtNDhmMS04YTZhLTZkZjUxMThmNDVjNwBGAAAAAAA6YQMMJTqrQJPxSLiaEDoTBwBPyUkxN4Z-SIewk9X7A6D1AAAAAAEMAABPyUkxN4Z-SIewk9X7A6D1AABBGgqEAAABEgAQAJjCpMANWxhBniTJMgEr1FM=)
+2025-11-17 16:50:37,453 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 16:50:37,453 [INFO] Started background invoice-checker thread.
+2025-11-17 16:50:45,505 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 16:50:49,518 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:50:59,450 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 16:50:59,450 [INFO] Started background invoice-checker thread.
+2025-11-17 16:51:05,226 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:51:07,491 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 16:51:11,510 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:51:13,263 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:51:17,289 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:51:26,131 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:51:26,193 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:51:34,158 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:51:34,219 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:51:38,171 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 16:51:38,234 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:51:47,082 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:51:47,099 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:51:55,133 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:51:55,133 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 16:51:59,168 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 16:52:07,967 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:52:15,998 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 16:55:04,054 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:55:14,796 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:55:22,818 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:55:24,804 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:55:26,839 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:55:35,293 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:55:35,618 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:55:43,345 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:55:43,658 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:55:47,370 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:55:47,678 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 16:55:56,076 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:55:56,370 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:56:04,138 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:56:04,418 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 16:56:08,151 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 16:56:16,858 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:56:24,923 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 16:56:40,439 [INFO] Stopping background worker...
+2025-11-17 16:56:45,212 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 16:56:49,504 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 16:56:49,505 [INFO] Started background invoice-checker thread.
+2025-11-17 16:56:57,571 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 16:57:01,579 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:57:16,588 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:57:24,642 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:57:28,666 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:57:32,099 [INFO] Stopping background worker...
+2025-11-17 16:57:40,792 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:57:41,699 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 16:57:46,016 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 16:57:46,016 [INFO] Started background invoice-checker thread.
+2025-11-17 16:57:54,059 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 16:57:58,092 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:58:13,399 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:58:21,460 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:58:25,483 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:58:34,354 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:58:42,401 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:58:46,427 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 16:58:55,270 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:59:03,317 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 16:59:13,347 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 16:59:24,285 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:59:32,347 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 16:59:36,370 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 16:59:45,189 [INFO] No new messages found since last checkpoint.
+2025-11-17 16:59:53,280 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 16:59:57,303 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 17:00:06,227 [INFO] No new messages found since last checkpoint.
+2025-11-17 17:00:14,274 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 17:02:12,184 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 17:02:22,878 [INFO] No new messages found since last checkpoint.
+2025-11-17 17:02:30,953 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 17:02:34,970 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 17:02:43,725 [INFO] No new messages found since last checkpoint.
+2025-11-17 17:02:51,789 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 17:02:55,813 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 17:03:04,549 [INFO] No new messages found since last checkpoint.
+2025-11-17 17:03:11,230 [INFO] Stopping background worker...
+2025-11-17 17:03:12,605 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 17:03:20,794 [INFO] Stopping background worker...
+2025-11-17 17:03:23,161 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:32:51,600 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:32:56,088 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:32:56,088 [INFO] Started background invoice-checker thread.
+2025-11-17 18:33:04,144 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:33:08,162 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:33:13,818 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:33:18,162 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:33:18,162 [INFO] Started background invoice-checker thread.
+2025-11-17 18:33:23,442 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:33:26,202 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:33:30,229 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:33:31,477 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:33:35,501 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:33:44,308 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:33:45,182 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:33:52,347 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:33:53,232 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:33:56,365 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:33:57,256 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:34:03,342 [ERROR] export_batch failed
+Traceback (most recent call last):
+  File "C:\Users\dmartinez\Documents\local-development\_python-project\_roxor-group\outlook-email-automation-v3\app.py", line 334, in export_batch
+    invoice_coll = get_mongo_collection("invoicecollection")
+TypeError: get_mongo_collection() takes 0 positional arguments but 1 was given
+2025-11-17 18:34:05,193 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:34:06,072 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:34:13,233 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:34:18,144 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:34:22,169 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:34:31,029 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:34:39,054 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:37:22,085 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:37:33,065 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:37:41,128 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:37:45,153 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:37:47,860 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:37:53,840 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:37:59,033 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:38:01,882 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:38:05,908 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:38:07,067 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:38:11,078 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:38:14,580 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:38:19,752 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:38:22,640 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:38:27,785 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:38:31,807 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:38:40,465 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:38:48,526 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:39:47,257 [INFO] Stopping background worker...
+2025-11-17 18:39:51,437 [INFO] Stopping background worker...
+2025-11-17 18:49:33,552 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:49:37,879 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:49:37,879 [INFO] Started background invoice-checker thread.
+2025-11-17 18:49:45,925 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:49:49,946 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:49:55,610 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:49:59,964 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:49:59,964 [INFO] Started background invoice-checker thread.
+2025-11-17 18:50:05,058 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:50:08,000 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:50:12,025 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:50:13,100 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:50:17,120 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:50:25,974 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:50:26,891 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:50:34,003 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:50:34,954 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:50:38,030 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:50:38,980 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:50:46,915 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:50:47,834 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:50:54,958 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:50:55,880 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:50:59,900 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:51:08,790 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:51:16,831 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:53:39,687 [ERROR] export_batch failed
+Traceback (most recent call last):
+  File "C:\Users\dmartinez\Documents\local-development\_python-project\_roxor-group\outlook-email-automation-v3\app.py", line 392, in export_batch
+    df = pd.DataFrame(rows)
+         ^^^^^^^^^^^^
+AttributeError: 'function' object has no attribute 'DataFrame'
+2025-11-17 18:54:03,712 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:54:14,953 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:54:22,992 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:54:26,528 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:54:27,007 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:54:35,815 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:54:37,406 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:54:43,859 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:54:45,453 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:54:47,874 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:54:49,483 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:54:56,757 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:54:58,320 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:55:04,798 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:55:06,350 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 18:55:10,376 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 18:55:19,230 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:55:27,261 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 18:57:27,492 [INFO] Stopping background worker...
+2025-11-17 18:57:31,759 [INFO] Stopping background worker...
+2025-11-17 18:59:00,326 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:59:04,629 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:59:04,630 [INFO] Started background invoice-checker thread.
+2025-11-17 18:59:12,677 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:59:16,699 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:59:22,330 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 18:59:26,657 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 18:59:26,658 [INFO] Started background invoice-checker thread.
+2025-11-17 18:59:31,653 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:59:34,714 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 18:59:38,738 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 18:59:39,723 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 18:59:43,737 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 18:59:52,562 [INFO] No new messages found since last checkpoint.
+2025-11-17 18:59:53,392 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:00:00,607 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:00:01,436 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:00:04,634 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:00:05,457 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:00:07,102 [ERROR] export_batch failed
+Traceback (most recent call last):
+  File "C:\Users\dmartinez\Documents\local-development\_python-project\_roxor-group\outlook-email-automation-v3\app.py", line 413, in export_batch
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+2025-11-17 19:00:13,313 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:00:17,528 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:00:21,363 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:00:25,597 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:00:29,607 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:00:38,309 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:00:46,338 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:02:45,320 [INFO] Stopping background worker...
+2025-11-17 19:02:49,660 [INFO] Stopping background worker...
+2025-11-17 19:04:30,782 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:04:35,121 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:04:35,121 [INFO] Started background invoice-checker thread.
+2025-11-17 19:04:39,994 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:04:43,188 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:04:47,203 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:04:52,746 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:04:57,110 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:04:57,110 [INFO] Started background invoice-checker thread.
+2025-11-17 19:04:58,133 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:05:02,153 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:05:02,238 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:05:05,153 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:05:09,171 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:05:10,204 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:05:14,235 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:05:18,892 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:05:20,053 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:05:22,905 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:05:24,077 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:05:30,936 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:05:32,121 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:05:34,953 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:05:36,143 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:05:39,609 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:05:40,785 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:05:43,623 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:05:44,798 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:05:51,671 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:05:52,843 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:05:56,863 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:06:01,578 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:06:05,592 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:06:13,637 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:08:56,484 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:09:00,505 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:09:07,263 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:09:11,288 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:09:18,637 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:09:19,339 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:09:22,667 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:09:23,370 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:09:28,221 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:09:29,261 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:09:32,253 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:09:33,291 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:09:40,335 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:09:41,335 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:09:44,351 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:09:45,359 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:09:49,282 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:09:50,159 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:09:53,304 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:09:54,179 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:10:01,347 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:10:02,231 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:10:06,254 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:10:11,052 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:10:15,072 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:10:23,103 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:13:07,717 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:13:11,740 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:13:19,279 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:13:23,298 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:13:27,974 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:13:31,344 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:13:31,996 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:13:35,387 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:13:38,439 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:13:40,101 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:13:42,465 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:13:44,117 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:13:50,507 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:13:52,157 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:13:54,526 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:13:56,167 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:13:59,186 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:14:00,883 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:14:03,210 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:14:04,909 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:14:11,262 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:14:12,960 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:14:15,274 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:14:19,911 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:14:23,928 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:14:31,977 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:15:22,704 [INFO] Stopping background worker...
+2025-11-17 19:15:26,964 [INFO] Stopping background worker...
+2025-11-17 19:20:52,639 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:20:56,973 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:20:56,974 [INFO] Started background invoice-checker thread.
+2025-11-17 19:21:01,674 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:21:05,009 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:21:09,038 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:21:14,669 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:21:18,990 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:21:18,990 [INFO] Started background invoice-checker thread.
+2025-11-17 19:21:19,906 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:21:23,680 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:21:23,926 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:21:27,024 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:21:31,050 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:21:31,987 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:21:36,001 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:21:40,841 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:21:41,889 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:21:44,863 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:21:45,910 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:21:52,906 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:21:53,966 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:21:56,927 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:21:57,986 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:22:01,772 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:22:02,743 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:22:05,795 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:22:06,767 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:22:13,863 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:22:14,817 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:22:18,846 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:22:23,603 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:22:27,631 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:22:35,669 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:24:40,826 [INFO] Stopping background worker...
+2025-11-17 19:24:50,374 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:24:54,721 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:24:54,721 [INFO] Started background invoice-checker thread.
+2025-11-17 19:24:59,738 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:25:02,760 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:25:06,780 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:25:12,379 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-11-17 19:25:16,720 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-11-17 19:25:16,720 [INFO] Started background invoice-checker thread.
+2025-11-17 19:25:17,629 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:25:21,429 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:25:21,639 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:25:24,771 [INFO] Starting Flask on port 5000 (debug=True)
+2025-11-17 19:25:28,795 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:25:29,700 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:25:33,720 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:25:38,397 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:25:39,196 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:25:42,418 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:25:43,217 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:25:50,466 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:25:51,316 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:25:54,490 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:25:55,336 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:25:59,253 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:25:59,985 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:26:03,268 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:26:03,998 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:26:11,301 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:26:12,035 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:26:16,063 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:26:20,796 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:26:24,825 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:26:32,875 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:29:16,033 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:29:20,050 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:29:26,930 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:29:30,949 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:29:37,612 [INFO]  Microsoft Graph token acquired.
+2025-11-17 19:29:39,000 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:29:41,640 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-11-17 19:29:43,025 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:29:47,704 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:29:47,985 [INFO]  Retrieved 14 new messages from Graph
+2025-11-17 19:29:51,732 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:29:52,001 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:29:59,804 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:30:00,051 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-11-17 19:30:03,834 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:30:04,086 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-11-17 19:30:08,495 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:30:08,759 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:30:12,518 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:30:12,785 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:30:20,554 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:30:20,836 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-11-17 19:30:24,856 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-11-17 19:30:29,522 [INFO]  Retrieved 0 new messages from Graph
+2025-11-17 19:30:33,542 [INFO] No new messages found since last checkpoint.
+2025-11-17 19:30:41,590 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-11-17 19:32:40,136 [INFO] Stopping background worker...
+2025-11-17 19:32:44,376 [INFO] Stopping background worker...

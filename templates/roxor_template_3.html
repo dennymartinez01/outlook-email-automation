@@ -22,10 +22,10 @@
 <body>
 <div class="container-fluid py-3">
   <div class="d-flex align-items-center mb-3">
-    <h3 class="me-3">📄 Extracted Invoices</h3>
-    <div class="ms-auto">
-      <button id="purgeBtn" class="btn btn-outline-danger btn-sm">Purge</button>
-    </div>
+    <h3 class="me-3">Extracted Invoices</h3>
+<!--    <div class="ms-auto">-->
+<!--      <button id="purgeBtn" class="btn btn-outline-danger btn-sm">Purge</button>-->
+<!--    </div>-->
   </div>
 
   <!-- Tabs -->
@@ -52,11 +52,11 @@
              placeholder="Search Vendor / Customer / Invoice #">
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+      <button type="submit" class="btn btn-sm btn-primary">Search</button> &nbsp;  <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>
     </div>
-    <div class="col-auto ms-auto">
-      <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>
-    </div>
+<!--    <div class="col-auto ms-auto">-->
+<!--      <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>-->
+<!--    </div>-->
   </form>
 
   <!-- Main 3-column layout -->
@@ -239,38 +239,45 @@
 
   // Export Selected
   $('#exportSelected').addEventListener('click', async function () {
-    const selected = $all('.inv-check:checked').map(cb => cb.value);
-    if (!selected.length) { alert('Please select at least one invoice to export.'); return; }
-
-    try {
-      // POST to server, get ZIP blob back
-      const res = await fetch('/export_batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoices: selected })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({message:res.statusText}));
-        alert('Export failed: ' + (err.message || res.statusText || 'Unknown'));
-        return;
+      const selected = $all('.inv-check:checked').map(cb => cb.value);
+      if (!selected.length) {
+          alert('Please select at least one invoice to export.');
+          return;
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'invoices_export.zip';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      try {
+          // POST to Excel export endpoint
+          const res = await fetch('/export_batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ invoices: selected })
+          });
 
-    } catch (err) {
-      console.error(err);
-      alert('Export request failed: ' + err.message);
-    }
+          if (!res.ok) {
+              const err = await res.json().catch(() => ({ message: res.statusText }));
+              alert('Export failed: ' + (err.message || res.statusText || 'Unknown'));
+              return;
+          }
+
+          // Read Excel file
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+
+          // Force XLSX filename (NOT ZIP)
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'FB60.xlsx';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+      } catch (err) {
+          console.error(err);
+          alert('Export request failed: ' + err.message);
+      }
   });
+
 
   // Purge button
   const purgeBtn = document.getElementById('purgeBtn');

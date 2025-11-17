@@ -7,6 +7,7 @@ import time
 import logging
 import threading
 import atexit
+from turtle import pd
 from urllib.parse import unquote
 
 from flask import Flask, render_template, request, jsonify, send_file, Response
@@ -54,6 +55,15 @@ def get_mongo_collection():
     client = MongoClient(MONGO_URI)
     db = client.get_database("email_invoice_db")
     return db.get_collection("invoicecollection")
+
+def get_collection_for_export(collection_name):
+    """
+    Custom helper for export functionality only.
+    Does not interfere with the existing get_mongo_collection() logic.
+    """
+    client = MongoClient(MONGO_URI)
+    db = client.get_database("email_invoice_db")
+    return db.get_collection(collection_name)
 
 def process_message_attachments(messages, category):
     """
@@ -318,80 +328,88 @@ def serve_pdf(filename):
 
 @app.route("/export_batch", methods=["POST"])
 def export_batch():
-    """
-    Request JSON: { "invoices": ["id1", "id2", ...] }
-    Returns: application/zip attachment with selected PDFs
-    """
     try:
         data = request.get_json() or {}
-        ids = data.get("invoices") or data.get("ids") or []
+        ids = data.get("invoices") or []
+
         if not ids:
             return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
 
-        coll = get_mongo_collection()
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for doc_id in ids:
-                # try ObjectId first, otherwise string
-                doc = None
-                try:
-                    if ObjectId.is_valid(doc_id):
-                        doc = coll.find_one({"_id": ObjectId(doc_id)})
-                except Exception:
-                    doc = None
-                if not doc:
-                    doc = coll.find_one({"_id": doc_id})
+        invoice_coll = get_collection_for_export("invoicecollection")
+        vendor_coll = get_collection_for_export("vendorcollection")
 
-                if not doc:
-                    logger.warning("Invoice not found for export: %s", doc_id)
-                    continue
+        rows = []
 
-                pdf_ref = doc.get("pdf_file")
-                if not pdf_ref:
-                    logger.warning("No pdf_file for %s", doc_id)
-                    continue
+        for doc_id in ids:
 
-                # If it's a direct http(s) url - download
-                if pdf_ref.startswith("http://") or pdf_ref.startswith("https://"):
-                    try:
-                        r = requests.get(pdf_ref, timeout=30)
-                        if r.status_code == 200:
-                            # create a friendly filename
-                            safe_name = f"{doc_id}.pdf"
-                            zf.writestr(safe_name, r.content)
-                            continue
-                        else:
-                            logger.warning("Failed to download pdf for %s (status=%s)", doc_id, r.status_code)
-                            continue
-                    except Exception as e:
-                        logger.exception("Error downloading pdf for %s: %s", doc_id, e)
-                        continue
-                # else: maybe local filename stored
-                local_path = os.path.join("invoices", pdf_ref)
-                if os.path.exists(local_path):
-                    with open(local_path, "rb") as f:
-                        zf.writestr(os.path.basename(local_path), f.read())
-                    continue
-                # last resort - if env has azure connection string, try blob download
-                try:
-                    from azure.storage.blob import BlobServiceClient
-                    AZ_CONN = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-                    if AZ_CONN:
-                        blob_service = BlobServiceClient.from_connection_string(AZ_CONN)
-                        container = blob_service.get_container_client("invoices")
-                        blob_name = pdf_ref.split("/")[-1] if "/" in pdf_ref else pdf_ref
-                        blob_bytes = container.download_blob(blob_name).readall()
-                        zf.writestr(blob_name, blob_bytes)
-                        continue
-                except Exception as e:
-                    logger.warning("Azure blob fallback failed for %s: %s", pdf_ref, e)
-                    continue
+            doc = None
+            if ObjectId.is_valid(doc_id):
+                doc = invoice_coll.find_one({"_id": ObjectId(doc_id)})
+            if doc is None:
+                doc = invoice_coll.find_one({"_id": doc_id})
 
-        buf.seek(0)
-        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="invoices_export.zip")
+            if not doc:
+                continue
+
+            inv = doc.get("invoice_data", {}) or {}
+
+            customer_name = (inv.get("CustomerName") or "").strip()
+            invoice_date = inv.get("InvoiceDate", "")
+
+            currency = (
+                inv.get("Currency")
+                or (inv.get("InvoiceTotal") or {}).get("currencySymbol")
+                or (inv.get("TotalTax") or {}).get("currencySymbol")
+                or ""
+            )
+
+            amount = (
+                (inv.get("InvoiceTotal") or {}).get("amount")
+                or (inv.get("Total") or {}).get("amount")
+                or (inv.get("TotalTax") or {}).get("amount")
+                or 0
+            )
+
+            try:
+                amount = float(amount)
+            except:
+                amount = 0
+
+            invoice_type = "credit" if amount < 0 else "debit"
+
+            vendor_doc = vendor_coll.find_one({"Name": customer_name})
+            vendor_code = vendor_doc.get("Account Code", "") if vendor_doc else ""
+
+            rows.append({
+                "Vendor SAP Account code": vendor_code,
+                "Invoice Date": invoice_date,
+                "Reference": customer_name,
+                "Currency": currency,
+                "Amount": abs(amount),
+                "Type": invoice_type
+            })
+
+        import pandas as pd
+        output = io.BytesIO()
+
+        df = pd.DataFrame(rows)
+        df.to_excel(output, index=False)
+
+        output.seek(0)
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="FB60.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
     except Exception as e:
         logger.exception("export_batch failed")
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+
 
 @app.route("/purge", methods=["POST"])
 def purge_invoices():

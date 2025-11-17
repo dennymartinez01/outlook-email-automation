@@ -32,7 +32,7 @@ def get_graph_token():
     resp.raise_for_status()
     token = resp.json().get("access_token")
 
-    logger.info("✅ Microsoft Graph token acquired.")
+    logger.info(" Microsoft Graph token acquired.")
     return token
 
 
@@ -59,14 +59,14 @@ def fetch_new_messages(token, category, target_email, top=10):
         try:
             last_id = json.loads(checkpoint_file.read_text()).get("last_message_id")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to read checkpoint: {e}")
+            logger.warning(f" Failed to read checkpoint: {e}")
 
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
     }
 
-    # 🔑 Expand attachments so PDFs are included directly in the response
+    # Expand attachments so PDFs are included directly in the response
     url = (
         f"{GRAPH_BASE_URL}/users/{target_email}/mailFolders/inbox/messages"
         f"?$top={top}"
@@ -78,7 +78,7 @@ def fetch_new_messages(token, category, target_email, top=10):
     resp = requests.get(url, headers=headers, timeout=30)
     resp.raise_for_status()
     messages = resp.json().get("value", [])
-    logger.info(f"📬 Retrieved {len(messages)} new messages from Graph")
+    logger.info(f" Retrieved {len(messages)} new messages from Graph")
 
     new_messages = []
     for msg in messages:
@@ -90,7 +90,7 @@ def fetch_new_messages(token, category, target_email, top=10):
     if new_messages:
         # Update checkpoint with the latest (most recent) message ID
         checkpoint_file.write_text(json.dumps({"last_message_id": new_messages[0]["id"]}))
-        logger.info(f"💾 Updated checkpoint to message {new_messages[0]['id']}")
+        logger.info(f" Updated checkpoint to message {new_messages[0]['id']}")
     else:
         logger.info("No new messages found since last checkpoint.")
 
