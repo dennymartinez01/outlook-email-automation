@@ -1,123 +1,226 @@
+# app.py
 import os
-import threading
+import io
+import zipfile
+import base64
 import time
 import logging
+import threading
 import atexit
-from bson.objectid import ObjectId
+from urllib.parse import unquote
+
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from pymongo import MongoClient
-from urllib.parse import unquote
-from dotenv import load_dotenv
+from bson.objectid import ObjectId
 import requests
-import monitor_azure_cosmosdb_cloud_version
+from dotenv import load_dotenv
 
-# ---------------------------------------------------------------------
-# Load .env file and environment variables
-# ---------------------------------------------------------------------
+# Load environment
 load_dotenv()
 
-# ---------------------------------------------------------------------
-# Flask app setup
-# ---------------------------------------------------------------------
-app = Flask(__name__)
+# Services (expected to exist as in your repo)
+from services.azure_graph_service import get_graph_token, fetch_new_messages
+from services.azure_blob_service import upload_pdf_blob
+from services.azure_ai_service import analyze_and_store
+
+# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("invoice-monitor")
 
-# ---------------------------------------------------------------------
-# Background worker
-# ---------------------------------------------------------------------
+# Flask app
+app = Flask(__name__)
+
+# Environment variables (required)
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    logger.error("MONGO_URI missing in environment. Exiting.")
+    raise SystemExit("MONGO_URI not configured")
+
+# Target inbox env names (per your confirmation)
+EMAIL_NONSTOCK = os.getenv("TARGET_EMAIL_NONSTOCK") or os.getenv("EMAIL_NONSTOCK")
+EMAIL_STOCK = os.getenv("TARGET_EMAIL_STOCK") or os.getenv("EMAIL_STOCK")
+EMAIL_CUSTOMER = os.getenv("TARGET_EMAIL_CUSTOMER") or os.getenv("EMAIL_CUSTOMER")
+
+TARGET_EMAILS = {
+    "nonstock": EMAIL_NONSTOCK,
+    "stock": EMAIL_STOCK,
+    "customer": EMAIL_CUSTOMER
+}
+
+# Background worker stop flag
 _stop_worker = False
 
+def get_mongo_collection():
+    client = MongoClient(MONGO_URI)
+    db = client.get_database("email_invoice_db")
+    return db.get_collection("invoicecollection")
+
+def process_message_attachments(messages, category):
+    """
+    messages: list of message dicts from Graph (with attachments expanded).
+    category: 'nonstock'|'stock'|'customer' - used to tag inserted records.
+    Returns list of stored doc ids.
+    """
+    stored_ids = []
+    collection = get_mongo_collection()
+
+    for msg in messages or []:
+        msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
+        attachments = msg.get("attachments", []) or []
+        logger.info("Processing message %s (attachments=%d) for category=%s", msg_id, len(attachments), category)
+
+        for att in attachments:
+            try:
+                content_type = (att.get("contentType") or "").lower()
+                filename = att.get("name") or "invoice.pdf"
+
+                # process only PDFs
+                if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
+                    logger.info("Skipping non-PDF attachment: %s (type=%s)", filename, content_type)
+                    continue
+
+                attachment_id = att.get("id") or att.get("attachmentId") or str(time.time()).replace('.', '')
+                safe_name = filename.replace(" ", "_").replace("/", "_")
+                blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
+
+                content_b64 = att.get("contentBytes")
+                if not content_b64:
+                    logger.warning("Attachment %s in message %s missing contentBytes; skipping", attachment_id, msg_id)
+                    continue
+
+                # decode bytes
+                try:
+                    file_bytes = base64.b64decode(content_b64)
+                except Exception as e:
+                    logger.exception("Failed to decode base64 for attachment %s: %s", attachment_id, e)
+                    continue
+
+                # upload to blob
+                try:
+                    logger.info("Uploading PDF to blob: %s", blob_name)
+                    blob_url = upload_pdf_blob(blob_name, file_bytes)
+                    logger.info("Uploaded blob -> %s", blob_url)
+                except Exception as e:
+                    logger.exception("Blob upload failed for %s: %s", blob_name, e)
+                    continue
+
+                # analyze and store (pass category)
+                try:
+                    logger.info("Analyzing & storing invoice (msg=%s att=%s)", msg_id, attachment_id)
+                    stored_id = analyze_and_store(blob_url, content_b64, msg_id, attachment_id, category=category)
+                    if stored_id:
+                        stored_ids.append(stored_id)
+                        logger.info("Stored invoice id=%s (category=%s)", stored_id, category)
+                    else:
+                        logger.warning("analyze_and_store returned no id for msg=%s att=%s", msg_id, attachment_id)
+                except Exception as e:
+                    logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
+                    continue
+
+            except Exception as e:
+                logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
+                continue
+
+    return stored_ids
+
 def run_invoice_checker_loop():
+    """Background loop that polls each configured inbox every N seconds."""
     global _stop_worker
+    POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", 180))  # seconds, default 180
+    logger.info("Background invoice monitor starting (interval=%s seconds)", POLL_INTERVAL)
+
     while not _stop_worker:
         try:
-            logger.info("🔁 Running invoice check...")
-            token = monitor_azure_cosmosdb_cloud_version.get_graph_token()
-            if token:
-                monitor_azure_cosmosdb_cloud_version.check_emails(token)
+            token = get_graph_token()
+            if not token:
+                logger.warning("Could not obtain Graph token; skipping this cycle.")
             else:
-                logger.warning("❌ Failed to get Graph token.")
-        except Exception as e:
-            logger.exception(f"❌ Error during invoice check: {e}")
-        time.sleep(180)  # every 3 minutes
+                # iterate configured inboxes
+                for category, email in TARGET_EMAILS.items():
+                    if not email:
+                        logger.info("No email configured for category=%s, skipping", category)
+                        continue
+                    try:
+                        logger.info("Checking inbox=%s for category=%s", email, category)
+                        # fetch messages from Graph (fetch_new_messages should accept category,email)
+                        messages = fetch_new_messages(token, category, email, top=50)
+                        if not messages:
+                            logger.info("No new messages for %s", email)
+                            continue
 
+                        logger.info("Found %d messages for %s", len(messages), email)
+                        processed = process_message_attachments(messages, category)
+                        logger.info("Processed %d attachments for category=%s", len(processed), category)
+
+                    except Exception as e:
+                        logger.exception("Error processing inbox %s for category=%s: %s", email, category, e)
+        except Exception as e:
+            logger.exception("Unexpected error in invoice checker loop: %s", e)
+
+        # Wait
+        time.sleep(POLL_INTERVAL)
+
+# background thread management
 def start_background_thread():
     thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
     thread.start()
-    logger.info("✅ Background invoice monitor thread started.")
+    logger.info("Started background invoice-checker thread.")
 
 def stop_background_thread():
     global _stop_worker
     _stop_worker = True
-    logger.info("🛑 Background worker stopping...")
+    logger.info("Stopping background worker...")
 
-# Start worker when app launches
+# start at import/run
 start_background_thread()
 atexit.register(stop_background_thread)
 
-# ---------------------------------------------------------------------
-# MongoDB / Cosmos DB connection
-# ---------------------------------------------------------------------
-def get_mongo_collection():
-    """
-    Connect to the database defined in .env (MONGO_URI).
-    Example: MONGO_URI=MongoClient("mongodb://localhost:27017/")
-    """
-    mongo_uri = os.getenv("MONGO_URI")
-    # if mongo_uri.startswith("MongoClient"):
-    #     # Strip MongoClient(...) wrapper if it exists
-    #     mongo_uri = mongo_uri.replace('MongoClient("', '').replace('")', '')
-    client = MongoClient(mongo_uri)
-    db = client["email_invoice_db"]
-    return db["invoicecollection"]
+# -------------------------
+# Flask routes
+# -------------------------
 
-# ---------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------
 @app.route("/")
 def home():
-    return "📬 Invoice monitor running. Visit /v2/invoices to view data."
+    return "📬 Invoice monitor running — visit /v2/invoices"
 
 @app.route("/api/invoice/<doc_id>")
 def invoice_detail_json(doc_id):
-    collection = get_mongo_collection()
+    coll = get_mongo_collection()
+    # try ObjectId then string id
+    doc = None
     try:
-        # handle both string and ObjectId _id
         if ObjectId.is_valid(doc_id):
-            doc = collection.find_one({"_id": ObjectId(doc_id)})
-        else:
-            doc = collection.find_one({"_id": doc_id})
-    except Exception as e:
-        logger.exception("❌ Error fetching invoice")
-        return jsonify({"error": "Error fetching invoice"}), 500
+            doc = coll.find_one({"_id": ObjectId(doc_id)})
+    except Exception:
+        doc = None
+    if not doc:
+        doc = coll.find_one({"_id": doc_id})
 
     if not doc:
         return jsonify({"error": "Invoice not found"}), 404
 
-    inv_data = doc.get("invoice_data", {})
+    inv_data = doc.get("invoice_data", {}) or {}
 
-    # ✅ build structure matching your Jinja JavaScript expectations
     invoice = {
         "InvoiceNumber": inv_data.get("InvoiceId", ""),
         "InvoiceDate": inv_data.get("InvoiceDate", ""),
         "DueDate": inv_data.get("DueDate", ""),
-        "Supplier": {"Name": inv_data.get("VendorName", "").replace("\n", " ")},
-        "Customer": {"Name": inv_data.get("CustomerName", "").replace("\n", " ")},
-        "Currency": inv_data.get("InvoiceTotal", {}).get("code", ""),
-        "SubTotal": inv_data.get("SubTotal", {}).get("amount", ""),
-        "TaxAmount": inv_data.get("TotalTax", {}).get("amount", ""),
-        "InvoiceTotal": inv_data.get("InvoiceTotal", {}).get("amount", ""),
-        "AmountDue": inv_data.get("AmountDue", {}).get("amount", ""),
+        "Supplier": {"Name": (inv_data.get("VendorName") or "").replace("\n", " ")},
+        "Customer": {"Name": (inv_data.get("CustomerName") or "").replace("\n", " ")},
+        "Currency": (inv_data.get("InvoiceTotal") or {}).get("code", ""),
+        "SubTotal": (inv_data.get("SubTotal") or {}).get("amount", ""),
+        "TaxAmount": (inv_data.get("TotalTax") or {}).get("amount", ""),
+        "InvoiceTotal": (inv_data.get("InvoiceTotal") or {}).get("amount", ""),
+        "AmountDue": (inv_data.get("AmountDue") or {}).get("amount", ""),
     }
 
-    # ✅ normalize line items
+    # normalize line items
     line_items = []
     for item in inv_data.get("Items", []):
         line_items.append({
             "Description": item.get("Description", ""),
-            "Net": item.get("Amount", ""),
-            "VAT": next((tax.get("Amount") for tax in inv_data.get("TaxDetails", []) if tax.get("Amount")), ""),
+            "Net": item.get("Amount", "") or item.get("Net", ""),
+            "VAT": next((td.get("Amount") for td in inv_data.get("TaxDetails", []) if td.get("Amount")), ""),
             "Total": item.get("Amount", "")
         })
 
@@ -126,117 +229,205 @@ def invoice_detail_json(doc_id):
         "LineItems": line_items,
         "pdf_file": doc.get("pdf_file", ""),
         "status": doc.get("status", ""),
-        "_id": str(doc.get("_id")),
+        "_id": str(doc.get("_id"))
     })
-
 
 @app.route("/v2/invoices")
 def invoices_v2():
-    collection = get_mongo_collection()
+    coll = get_mongo_collection()
 
-    # 🔍 Search query from user
-    search_query = request.args.get("vendor", "").strip().lower()
+    search_query = request.args.get("vendor", "").strip()
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 10))
+    category = request.args.get("category", "nonstock").lower()
 
-    # Fetch all invoices (you can later add MongoDB regex filtering)
-    docs = list(collection.find().sort("processed_at", -1))
+    # Build query: for nonstock include documents without category (back-compat)
+    if category == "nonstock":
+        query = {"$or": [{"category": "nonstock"}, {"category": {"$exists": False}}]}
+    else:
+        query = {"category": category}
+
+    if search_query:
+        regex = {"$regex": search_query, "$options": "i"}
+        # search in invoice fields inside invoice_data
+        query["$or"] = [
+            {"invoice_data.InvoiceId": regex},
+            {"invoice_data.VendorName": regex},
+            {"invoice_data.CustomerName": regex}
+        ]
+
+    total = coll.count_documents(query)
+    total_pages = (total + per_page - 1) // per_page or 1
+    skip = (page - 1) * per_page
+
+    docs = list(coll.find(query).sort("processed_at", -1).skip(skip).limit(per_page))
 
     invoices = []
     for doc in docs:
-        data = doc.get("invoice_data", {})
-        total_data = data.get("InvoiceTotal", {}) or {}
-
-        # Optional: text filter
-        vendor_name = (data.get("VendorName") or "").lower()
-        invoice_no = str(data.get("InvoiceId", "")).lower()
-        customer_name = (data.get("CustomerName") or "").lower()
-
-        if search_query and search_query not in vendor_name and search_query not in invoice_no and search_query not in customer_name:
-            continue
-
+        inv = doc.get("invoice_data", {}) or {}
+        total_data = inv.get("InvoiceTotal") or {}
         invoices.append({
             "_id": str(doc.get("_id")),
-            "invoice_no": data.get("InvoiceId", "N/A"),
-            "date": data.get("InvoiceDate", "N/A"),
-            "vendor": data.get("VendorName", "N/A").replace("\n", " "),
-            "customer": data.get("CustomerName", "N/A").replace("\n", " "),
-            "total": f"{total_data.get('symbol', '')}{total_data.get('amount', '')}",
-            "status": doc.get("status", "N/A"),
+            "invoice_no": inv.get("InvoiceId", "") or inv.get("InvoiceNumber", "") or "",
+            "date": inv.get("InvoiceDate", ""),
+            "vendor": (inv.get("VendorName") or "").replace("\n", " "),
+            "customer": (inv.get("CustomerName") or "").replace("\n", " "),
+            "total": f"{total_data.get('symbol','')}{total_data.get('amount','')}" if isinstance(total_data, dict) else total_data,
+            "status": doc.get("status", ""),
             "pdf_file": doc.get("pdf_file", "")
         })
-
-    # Pagination logic
-    page = int(request.args.get("page", 1))
-    per_page = 10
-    total_pages = (len(invoices) + per_page - 1) // per_page or 1
-    start = (page - 1) * per_page
-    end = start + per_page
 
     start_page = max(1, page - 2)
     end_page = min(total_pages, page + 2)
 
     return render_template(
         "roxor_template_3.html",
-        invoices=invoices[start:end],
+        invoices=invoices,
         vendor=search_query,
         page=page,
+        per_page=per_page,
         total_pages=total_pages,
         start_page=start_page,
-        end_page=end_page
+        end_page=end_page,
+        active_category=category
     )
-
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
+    """
+    Serve a PDF that may be:
+      - A full Azure blob URL (http/https) -> stream
+      - A local file under invoices/ -> serve
+    """
     try:
-        decoded_filename = unquote(filename)
-        if decoded_filename.startswith("http"):
-            resp = requests.get(decoded_filename, stream=True)
-            if resp.status_code == 200:
-                return Response(resp.iter_content(chunk_size=8192), content_type="application/pdf")
-            return f"Error fetching PDF from {decoded_filename}", 400
-
-        local_path = os.path.join("invoices", decoded_filename)
+        decoded = unquote(filename)
+        if decoded.startswith("http://") or decoded.startswith("https://"):
+            r = requests.get(decoded, stream=True, timeout=30)
+            if r.status_code == 200:
+                return Response(r.iter_content(chunk_size=8192), content_type="application/pdf")
+            else:
+                return (f"Failed to fetch remote PDF ({r.status_code})", 404)
+        # local file
+        local_path = os.path.join("invoices", decoded)
         if os.path.exists(local_path):
             return send_file(local_path, mimetype="application/pdf")
-
-        return f"PDF not found: {decoded_filename}", 404
+        return (f"PDF not found: {decoded}", 404)
     except Exception as e:
         logger.exception("Error serving PDF")
-        return f"Error serving PDF: {str(e)}", 500
+        return (f"Error serving PDF: {e}", 500)
+
+@app.route("/export_batch", methods=["POST"])
+def export_batch():
+    """
+    Request JSON: { "invoices": ["id1", "id2", ...] }
+    Returns: application/zip attachment with selected PDFs
+    """
+    try:
+        data = request.get_json() or {}
+        ids = data.get("invoices") or data.get("ids") or []
+        if not ids:
+            return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
+
+        coll = get_mongo_collection()
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for doc_id in ids:
+                # try ObjectId first, otherwise string
+                doc = None
+                try:
+                    if ObjectId.is_valid(doc_id):
+                        doc = coll.find_one({"_id": ObjectId(doc_id)})
+                except Exception:
+                    doc = None
+                if not doc:
+                    doc = coll.find_one({"_id": doc_id})
+
+                if not doc:
+                    logger.warning("Invoice not found for export: %s", doc_id)
+                    continue
+
+                pdf_ref = doc.get("pdf_file")
+                if not pdf_ref:
+                    logger.warning("No pdf_file for %s", doc_id)
+                    continue
+
+                # If it's a direct http(s) url - download
+                if pdf_ref.startswith("http://") or pdf_ref.startswith("https://"):
+                    try:
+                        r = requests.get(pdf_ref, timeout=30)
+                        if r.status_code == 200:
+                            # create a friendly filename
+                            safe_name = f"{doc_id}.pdf"
+                            zf.writestr(safe_name, r.content)
+                            continue
+                        else:
+                            logger.warning("Failed to download pdf for %s (status=%s)", doc_id, r.status_code)
+                            continue
+                    except Exception as e:
+                        logger.exception("Error downloading pdf for %s: %s", doc_id, e)
+                        continue
+                # else: maybe local filename stored
+                local_path = os.path.join("invoices", pdf_ref)
+                if os.path.exists(local_path):
+                    with open(local_path, "rb") as f:
+                        zf.writestr(os.path.basename(local_path), f.read())
+                    continue
+                # last resort - if env has azure connection string, try blob download
+                try:
+                    from azure.storage.blob import BlobServiceClient
+                    AZ_CONN = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                    if AZ_CONN:
+                        blob_service = BlobServiceClient.from_connection_string(AZ_CONN)
+                        container = blob_service.get_container_client("invoices")
+                        blob_name = pdf_ref.split("/")[-1] if "/" in pdf_ref else pdf_ref
+                        blob_bytes = container.download_blob(blob_name).readall()
+                        zf.writestr(blob_name, blob_bytes)
+                        continue
+                except Exception as e:
+                    logger.warning("Azure blob fallback failed for %s: %s", pdf_ref, e)
+                    continue
+
+        buf.seek(0)
+        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="invoices_export.zip")
+    except Exception as e:
+        logger.exception("export_batch failed")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route("/purge", methods=["POST"])
 def purge_invoices():
     try:
-        collection = get_mongo_collection()
-        all_invoices = list(collection.find({}, {"pdf_file": 1}))
-        collection.delete_many({})
-        logger.info("✅ All invoices deleted from MongoDB")
+        coll = get_mongo_collection()
+        all_docs = list(coll.find({}, {"pdf_file": 1}))
 
-        from azure.storage.blob import BlobServiceClient
-        AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-        blob_service = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-        container = blob_service.get_container_client("invoices")
+        # delete DB records
+        coll.delete_many({})
+        logger.info("Deleted all invoice records from MongoDB.")
 
-        for inv in all_invoices:
-            pdf_ref = inv.get("pdf_file")
-            if not pdf_ref:
-                continue
-            try:
-                blob_name = pdf_ref.split("/")[-1] if pdf_ref.startswith("http") else pdf_ref
-                container.delete_blob(blob_name)
-                logger.info(f"🗑️ Deleted from Blob: {blob_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ Could not delete blob {pdf_ref}: {e}")
+        # delete blobs if possible
+        AZ_CONN = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        if AZ_CONN:
+            from azure.storage.blob import BlobServiceClient
+            blob_service = BlobServiceClient.from_connection_string(AZ_CONN)
+            container = blob_service.get_container_client("invoices")
+            for d in all_docs:
+                pdf_ref = d.get("pdf_file")
+                if not pdf_ref:
+                    continue
+                blob_name = pdf_ref.split("/")[-1] if "/" in pdf_ref else pdf_ref
+                try:
+                    container.delete_blob(blob_name)
+                    logger.info("Deleted blob %s", blob_name)
+                except Exception as e:
+                    logger.warning("Could not delete blob %s: %s", blob_name, e)
 
-        return jsonify({"success": True, "message": "All invoices and PDFs purged successfully."})
+        return jsonify({"success": True, "message": "All invoices and PDFs purged."})
     except Exception as e:
-        logger.exception("❌ Purge failed")
+        logger.exception("purge failed")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# ---------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------
+# Run the app
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    logger.info(f"🚀 Starting Flask server on http://localhost:{port}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug = os.getenv("FLASK_DEBUG", "True").lower() in ("1", "true", "yes")
+    logger.info("Starting Flask on port %s (debug=%s)", port, debug)
+    app.run(host="0.0.0.0", port=port, debug=debug)

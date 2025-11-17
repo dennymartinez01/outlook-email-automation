@@ -13,6 +13,7 @@ Responsibilities:
 """
 
 import logging
+import os
 import time
 import base64
 from typing import List
@@ -22,6 +23,9 @@ from services.azure_graph_service import get_graph_token as _get_graph_token
 from services.azure_graph_service import fetch_new_messages
 from services.azure_blob_service import upload_pdf_blob
 from services.azure_ai_service import analyze_and_store
+
+from services.azure_graph_service import fetch_new_messages
+from services.azure_graph_service import get_graph_token
 
 # ---------------------------------------------------------------------
 # Logging setup
@@ -92,7 +96,30 @@ def check_emails(token: str, top: int = 50) -> List[str]:
 
     # Fetch messages with attachments
     try:
-        messages = fetch_new_messages(token, top=top)
+        target_emails = {
+            "nonstock": os.getenv("TARGET_EMAIL_NONSTOCK"),
+            "stock": os.getenv("TARGET_EMAIL_STOCK"),
+            "customer": os.getenv("TARGET_EMAIL_CUSTOMER")
+        }
+
+        for category, email in target_emails.items():
+
+            if not email:
+                logger.warning(f"No inbox configured for category: {category}")
+                continue
+
+            logger.info(f"📥 Checking inbox for category={category}: {email}")
+
+            try:
+                messages = fetch_new_messages(token, category, email, top=top)
+            except Exception as e:
+                logger.exception(f"Failed to fetch messages for {category}: {e}")
+                continue
+
+            logger.info(f"📬 Retrieved {len(messages)} new messages for category={category}")
+
+            # existing message loop (move inside this loop)
+
     except Exception as e:
         logger.exception("Failed to fetch messages from Graph: %s", e)
         return processed_docs
@@ -143,7 +170,14 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 # --- Analyze + Store via Azure AI ---
                 try:
                     logger.info("🧠 Analyzing invoice for %s...", filename)
-                    result = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
+                    result = analyze_and_store(
+                        blob_url,
+                        content_b64,
+                        msg_id,
+                        attachment_id,
+                        category=category
+                    )
+
                     if result:
                         safe_result = sanitize_for_mongo(result)
                         processed_docs.append(safe_result.get("_id") or safe_result)

@@ -94,7 +94,8 @@ def sanitize_for_mongo(data):
 # ---------------------------------------------------------------------
 # Main: Analyze and store
 # ---------------------------------------------------------------------
-def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None):
+def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None, category="nonstock"):
+
     """
     Analyze a PDF invoice stored in Azure Blob and store structured data in MongoDB.
     Returns the stored document ID or None on failure.
@@ -147,6 +148,7 @@ def analyze_and_store(blob_url, content_b64, msg_id=None, attachment_id=None):
             "confidence": confidence,
             "status": status,
             "processed_at": datetime.utcnow().isoformat(),
+            "category": category
         }
 
         # Store in MongoDB

@@ -37,15 +37,20 @@ def get_graph_token():
 
 
 @with_retry(max_attempts=3)
-def fetch_new_messages(token, top=10):
+def fetch_new_messages(token, category, target_email, top=10):
     """
     Fetch new messages (with attachments expanded) from the target inbox.
 
     Uses last_processed.json as a checkpoint to avoid reprocessing.
     Returns only messages that contain attachments (typically PDFs).
     """
-    target_email = os.getenv("TARGET_USER_EMAIL")
-    if not target_email:
+    # target_email = os.getenv("TARGET_USER_EMAIL")
+    target_emails = {
+        "nonstock": os.getenv("TARGET_EMAIL_NONSTOCK"),
+        "stock": os.getenv("TARGET_EMAIL_STOCK"),
+        "customer": os.getenv("TARGET_EMAIL_CUSTOMER")
+    }
+    if not target_emails:
         raise ValueError("TARGET_USER_EMAIL not configured in .env")
 
     checkpoint_file = Path(__file__).resolve().parent.parent / "last_processed.json"
