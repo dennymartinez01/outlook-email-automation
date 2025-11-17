@@ -7,7 +7,6 @@ import time
 import logging
 import threading
 import atexit
-from turtle import pd
 from urllib.parse import unquote
 
 from flask import Flask, render_template, request, jsonify, send_file, Response
