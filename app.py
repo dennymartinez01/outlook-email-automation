@@ -7,6 +7,9 @@ import time
 import logging
 import threading
 import atexit
+import re
+import pandas as pd
+
 from urllib.parse import unquote
 
 from flask import Flask, render_template, request, jsonify, send_file, Response
@@ -325,6 +328,89 @@ def serve_pdf(filename):
         logger.exception("Error serving PDF")
         return (f"Error serving PDF: {e}", 500)
 
+# @app.route("/export_batch", methods=["POST"])
+# def export_batch():
+#     try:
+#         data = request.get_json() or {}
+#         ids = data.get("invoices") or []
+#
+#         if not ids:
+#             return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
+#
+#         invoice_coll = get_collection_for_export("invoicecollection")
+#         vendor_coll = get_collection_for_export("vendorcollection")
+#
+#         rows = []
+#
+#         for doc_id in ids:
+#
+#             doc = None
+#             if ObjectId.is_valid(doc_id):
+#                 doc = invoice_coll.find_one({"_id": ObjectId(doc_id)})
+#             if doc is None:
+#                 doc = invoice_coll.find_one({"_id": doc_id})
+#
+#             if not doc:
+#                 continue
+#
+#             inv = doc.get("invoice_data", {}) or {}
+#
+#             customer_name = (inv.get("CustomerName") or "").strip()
+#             invoice_date = inv.get("InvoiceDate", "")
+#
+#             currency = (
+#                 inv.get("Currency")
+#                 or (inv.get("InvoiceTotal") or {}).get("currencySymbol")
+#                 or (inv.get("TotalTax") or {}).get("currencySymbol")
+#                 or ""
+#             )
+#
+#             amount = (
+#                 (inv.get("InvoiceTotal") or {}).get("amount")
+#                 or (inv.get("Total") or {}).get("amount")
+#                 or (inv.get("TotalTax") or {}).get("amount")
+#                 or 0
+#             )
+#
+#             try:
+#                 amount = float(amount)
+#             except:
+#                 amount = 0
+#
+#             invoice_type = "credit" if amount < 0 else "debit"
+#
+#             vendor_doc = vendor_coll.find_one({"Name": customer_name})
+#             vendor_code = vendor_doc.get("Account Code", "") if vendor_doc else ""
+#
+#             rows.append({
+#                 "Vendor SAP Account code": vendor_code,
+#                 "Invoice Date": invoice_date,
+#                 "Reference": customer_name,
+#                 "Currency": currency,
+#                 "Amount": abs(amount),
+#                 "Type": invoice_type
+#             })
+#
+#         import pandas as pd
+#         output = io.BytesIO()
+#
+#         df = pd.DataFrame(rows)
+#         df.to_excel(output, index=False)
+#
+#         output.seek(0)
+#
+#         return send_file(
+#             output,
+#             as_attachment=True,
+#             download_name="FB60.xlsx",
+#             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+#         )
+#
+#     except Exception as e:
+#         logger.exception("export_batch failed")
+#         return jsonify({"success": False, "message": str(e)}), 500
+
+
 @app.route("/export_batch", methods=["POST"])
 def export_batch():
     try:
@@ -334,6 +420,7 @@ def export_batch():
         if not ids:
             return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
 
+        # These functions must be defined/imported in your actual file scope
         invoice_coll = get_collection_for_export("invoicecollection")
         vendor_coll = get_collection_for_export("vendorcollection")
 
@@ -352,21 +439,22 @@ def export_batch():
 
             inv = doc.get("invoice_data", {}) or {}
 
+            # --- Extract Invoice Data ---
             customer_name = (inv.get("CustomerName") or "").strip()
             invoice_date = inv.get("InvoiceDate", "")
 
             currency = (
-                inv.get("Currency")
-                or (inv.get("InvoiceTotal") or {}).get("currencySymbol")
-                or (inv.get("TotalTax") or {}).get("currencySymbol")
-                or ""
+                    inv.get("Currency")
+                    or (inv.get("InvoiceTotal") or {}).get("currencySymbol")
+                    or (inv.get("TotalTax") or {}).get("currencySymbol")
+                    or ""
             )
 
             amount = (
-                (inv.get("InvoiceTotal") or {}).get("amount")
-                or (inv.get("Total") or {}).get("amount")
-                or (inv.get("TotalTax") or {}).get("amount")
-                or 0
+                    (inv.get("InvoiceTotal") or {}).get("amount")
+                    or (inv.get("Total") or {}).get("amount")
+                    or (inv.get("TotalTax") or {}).get("amount")
+                    or 0
             )
 
             try:
@@ -376,9 +464,34 @@ def export_batch():
 
             invoice_type = "credit" if amount < 0 else "debit"
 
-            vendor_doc = vendor_coll.find_one({"Name": customer_name})
+            # --- VENDOR LOOKUP: Postcode & Company Code 1000 ---
+            vendor_doc = None
+            vendor_code = ""
+
+            # 1. Extract the Postcode from the Invoice Data (VendorAddress)
+            invoice_postcode = (inv.get("VendorAddress", {}).get("postal_code") or "").strip()
+
+            if invoice_postcode:
+                # 2. Prepare the Postcode for robust, case-insensitive, wildcard-tolerant matching
+                # Escape any regex special characters in the postcode (e.g., if it contained a dot)
+                postcode_pattern = f".*{re.escape(invoice_postcode)}.*"
+
+                # 3. Build the MongoDB filter: Match Postcode AND Company Code 1000
+                vendor_filter = {
+                    "Company Code": 1000,
+                    "Postcode": {
+                        "$regex": postcode_pattern,
+                        "$options": "i"  # Case-insensitive search
+                    }
+                }
+
+                # 4. Execute the lookup
+                vendor_doc = vendor_coll.find_one(vendor_filter)
+
+            # 5. Extract the code, will be "" if no vendor_doc was found
             vendor_code = vendor_doc.get("Account Code", "") if vendor_doc else ""
 
+            # --- Append Row for Export ---
             rows.append({
                 "Vendor SAP Account code": vendor_code,
                 "Invoice Date": invoice_date,
@@ -388,7 +501,7 @@ def export_batch():
                 "Type": invoice_type
             })
 
-        import pandas as pd
+        # --- Export to Excel ---
         output = io.BytesIO()
 
         df = pd.DataFrame(rows)
@@ -406,7 +519,6 @@ def export_batch():
     except Exception as e:
         logger.exception("export_batch failed")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 
 
