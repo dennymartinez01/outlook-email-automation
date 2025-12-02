@@ -6,3 +6,5 @@ seqlog
 python-dotenv
 azure-ai-formrecognizer>=3.3.0
 azure-core>=1.29.0
+pandas
+openpyxl

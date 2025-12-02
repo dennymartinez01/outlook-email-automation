@@ -13,6 +13,7 @@ Responsibilities:
 """
 
 import logging
+import os
 import time
 import base64
 from typing import List
@@ -22,6 +23,9 @@ from services.azure_graph_service import get_graph_token as _get_graph_token
 from services.azure_graph_service import fetch_new_messages
 from services.azure_blob_service import upload_pdf_blob
 from services.azure_ai_service import analyze_and_store
+
+from services.azure_graph_service import fetch_new_messages
+from services.azure_graph_service import get_graph_token
 
 # ---------------------------------------------------------------------
 # Logging setup
@@ -87,12 +91,35 @@ def check_emails(token: str, top: int = 50) -> List[str]:
     processed_docs: List[str] = []
 
     if not token:
-        logger.error("❌ No Graph token provided to check_emails()")
+        logger.error(" No Graph token provided to check_emails()")
         return processed_docs
 
     # Fetch messages with attachments
     try:
-        messages = fetch_new_messages(token, top=top)
+        target_emails = {
+            "nonstock": os.getenv("TARGET_EMAIL_NONSTOCK"),
+            "stock": os.getenv("TARGET_EMAIL_STOCK"),
+            "customer": os.getenv("TARGET_EMAIL_CUSTOMER")
+        }
+
+        for category, email in target_emails.items():
+
+            if not email:
+                logger.warning(f"No inbox configured for category: {category}")
+                continue
+
+            logger.info(f" Checking inbox for category={category}: {email}")
+
+            try:
+                messages = fetch_new_messages(token, category, email, top=top)
+            except Exception as e:
+                logger.exception(f"Failed to fetch messages for {category}: {e}")
+                continue
+
+            logger.info(f" Retrieved {len(messages)} new messages for category={category}")
+
+            # existing message loop (move inside this loop)
+
     except Exception as e:
         logger.exception("Failed to fetch messages from Graph: %s", e)
         return processed_docs
@@ -128,28 +155,35 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 try:
                     file_bytes = base64.b64decode(content_b64)
                 except Exception as e:
-                    logger.error("❌ Failed to decode attachment %s in message %s: %s", attachment_id, msg_id, e)
+                    logger.error(" Failed to decode attachment %s in message %s: %s", attachment_id, msg_id, e)
                     continue
 
                 # --- Upload to Azure Blob (binary bytes, not Base64) ---
                 try:
-                    logger.info("☁️ Uploading blob: %s", blob_name)
+                    logger.info(" Uploading blob: %s", blob_name)
                     blob_url = upload_pdf_blob(blob_name, file_bytes)
-                    logger.info("✅ Uploaded successfully: %s", blob_url)
+                    logger.info(" Uploaded successfully: %s", blob_url)
                 except Exception as e:
                     logger.exception("Blob upload failed for %s (msg=%s): %s", blob_name, msg_id, e)
                     continue
 
                 # --- Analyze + Store via Azure AI ---
                 try:
-                    logger.info("🧠 Analyzing invoice for %s...", filename)
-                    result = analyze_and_store(blob_url, content_b64, msg_id, attachment_id)
+                    logger.info(" Analyzing invoice for %s...", filename)
+                    result = analyze_and_store(
+                        blob_url,
+                        content_b64,
+                        msg_id,
+                        attachment_id,
+                        category=category
+                    )
+
                     if result:
                         safe_result = sanitize_for_mongo(result)
                         processed_docs.append(safe_result.get("_id") or safe_result)
-                        logger.info("🧾 Stored invoice successfully: %s", safe_result.get("_id"))
+                        logger.info(" Stored invoice successfully: %s", safe_result.get("_id"))
                     else:
-                        logger.warning("⚠️ No result returned for %s", filename)
+                        logger.warning(" No result returned for %s", filename)
                 except Exception as e:
                     logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
                     continue
@@ -158,7 +192,7 @@ def check_emails(token: str, top: int = 50) -> List[str]:
                 logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
                 continue
 
-    logger.info("✅ Completed processing %d message(s); %d stored document(s)", msg_count, len(processed_docs))
+    logger.info(" Completed processing %d message(s); %d stored document(s)", msg_count, len(processed_docs))
     return processed_docs
 
 # ---------------------------------------------------------------------
@@ -166,7 +200,7 @@ def check_emails(token: str, top: int = 50) -> List[str]:
 # ---------------------------------------------------------------------
 def run_forever(interval_seconds: int = 180):
     """Continuously check inbox every few minutes."""
-    logger.info("🔁 Starting continuous invoice monitor (interval=%ss)...", interval_seconds)
+    logger.info(" Starting continuous invoice monitor (interval=%ss)...", interval_seconds)
     while True:
         try:
             token = get_graph_token()

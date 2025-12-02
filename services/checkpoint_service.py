@@ -12,7 +12,7 @@ def mark_message_processed(message_id: str):
         {"$set": {"status": "success", "processed_at": datetime.utcnow()}},
         upsert=True
     )
-    logger.info(f"✅ Marked message {message_id} as processed.")
+    logger.info(f" Marked message {message_id} as processed.")
 
 def is_message_processed(message_id: str) -> bool:
     collections = get_db_collections()

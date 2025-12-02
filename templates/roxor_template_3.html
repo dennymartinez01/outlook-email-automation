@@ -1,208 +1,304 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>📄 Extracted Invoices</title>
+  <meta charset="utf-8" />
+  <title>📄 Invoice Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <style>
-    .selected-row {
-      background-color: #dbeafe !important; /* highlight row */
-    }
+    body { background: #f8fafb; }
+    .selected-row { background-color: #e6f0ff !important; }
+    .inv-list { max-height: 78vh; overflow: auto; }
+    .details-col { max-height: 78vh; overflow: auto; }
+    .pdf-col { height: 78vh; }
+    .small-muted { font-size: .85rem; color: #6c757d; }
+    .checkbox-cell { width: 36px; text-align: center; }
+    .nowrap { white-space: nowrap; }
   </style>
 </head>
-<body class="bg-light">
-
+<body>
 <div class="container-fluid py-3">
-  <h2 class="mb-3">📄 Extracted Invoices</h2>
+  <div class="d-flex align-items-center mb-3">
+    <h3 class="me-3">Extracted Invoices</h3>
+<!--    <div class="ms-auto">-->
+<!--      <button id="purgeBtn" class="btn btn-outline-danger btn-sm">Purge</button>-->
+<!--    </div>-->
+  </div>
 
-  <!-- 🔍 Filter Form -->
-  <form method="get" class="row g-3 mb-3">
-    <div class="col-md-6">
-      <input type="text" name="vendor" value="{{ vendor or '' }}" class="form-control"
-             placeholder="Search for Vendor, Customer and Invoice Number">
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item">
+      <a class="nav-link {% if active_category == 'nonstock' %}active{% endif %}"
+         href="/v2/invoices?category=nonstock{% if vendor %}&vendor={{ vendor|urlencode }}{% endif %}">Non-stock</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_category == 'stock' %}active{% endif %}"
+         href="/v2/invoices?category=stock{% if vendor %}&vendor={{ vendor|urlencode }}{% endif %}">Stock</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_category == 'customer' %}active{% endif %}"
+         href="/v2/invoices?category=customer{% if vendor %}&vendor={{ vendor|urlencode }}{% endif %}">Customer</a>
+    </li>
+  </ul>
+
+  <!-- Search + Export -->
+  <form id="searchForm" method="get" class="row g-2 align-items-center mb-3">
+    <input type="hidden" name="category" value="{{ active_category or 'nonstock' }}">
+    <div class="col-auto">
+      <input type="text" name="vendor" value="{{ vendor or '' }}" class="form-control form-control-sm"
+             placeholder="Search Vendor / Customer / Invoice #">
     </div>
-    <div class="col-md-3">
-      <button class="btn btn-primary">Search</button> &nbsp;
-      <button type="button" id="purgeBtn" class="btn btn-danger">Purge</button>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm btn-primary">Search</button> &nbsp;  <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>
     </div>
+<!--    <div class="col-auto ms-auto">-->
+<!--      <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>-->
+<!--    </div>-->
   </form>
 
-  <!-- 🔳 Three-Column Layout -->
-  <div class="row">
-    <!-- Column 1: Invoice List -->
-    <div class="col-4 border-end" style="max-height:85vh;overflow:auto;">
-      <table class="table table-striped table-hover bg-white rounded shadow-sm">
-        <thead>
-        <tr>
-          <th>Invoice #</th>
-          <th>Date</th>
-          <th>Vendor</th>
-          <th>Total</th>
-          <th>Action</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for inv in invoices %}
-        <tr data-id="{{ inv._id }}">
-          <td>{{ inv.invoice_no }}</td>
-          <td>{{ inv.date }}</td>
-          <td>{{ inv.vendor }}</td>
-          <td>${{ inv.total }}</td>
-          <td>
-            <button type="button" class="btn btn-sm btn-primary view-details"
-                    data-id="{{ inv._id }}" data-pdf="{{ inv.pdf_file }}">View</button>
-            <a href="/export?invoice_id={{ inv._id }}" class="btn btn-sm btn-success">Export</a>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="5" class="text-center text-muted">No invoices found</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+  <!-- Main 3-column layout -->
+  <div class="row g-0">
+    <!-- Column 1: Invoice list -->
+    <div class="col-4 border-end bg-white inv-list p-3">
+      <form id="listForm">
+        <table class="table table-hover table-sm mb-0">
+          <thead>
+            <tr>
+              <th class="checkbox-cell"><input id="selectAll" type="checkbox" title="Select all"></th>
+              <th class="nowrap">Invoice #</th>
+              <th class="nowrap">Date</th>
+              <th>Vendor</th>
+              <th class="text-end nowrap">Total</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in invoices %}
+            <tr data-id="{{ inv._id }}">
+              <td class="checkbox-cell"><input type="checkbox" class="inv-check" value="{{ inv._id }}"></td>
+              <td class="nowrap">{{ inv.invoice_no }}</td>
+              <td class="nowrap">{{ inv.date }}</td>
+              <td>{{ inv.vendor }}</td>
+              <td class="text-end">{{ inv.total }}</td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-primary view-details" data-id="{{ inv._id }}" data-pdf="{{ inv.pdf_file }}">View</button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted">No invoices found</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </form>
 
-      <!-- 📑 Pagination -->
-      <nav>
-        <ul class="pagination">
+      <!-- Pagination -->
+      <nav class="mt-3">
+        <ul class="pagination pagination-sm mb-0">
           <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-            <a class="page-link" href="?page={{ page-1 }}&vendor={{ vendor|urlencode }}">Previous</a>
+            <a class="page-link" href="?page={{ page-1 }}&vendor={{ vendor|urlencode }}&category={{ active_category }}">Previous</a>
           </li>
+
           {% for p in range(start_page, end_page+1) %}
           <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="?page={{ p }}&vendor={{ vendor|urlencode }}">{{ p }}</a>
+            <a class="page-link" href="?page={{ p }}&vendor={{ vendor|urlencode }}&category={{ active_category }}">{{ p }}</a>
           </li>
           {% endfor %}
+
           <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-            <a class="page-link" href="?page={{ page+1 }}&vendor={{ vendor|urlencode }}">Next</a>
+            <a class="page-link" href="?page={{ page+1 }}&vendor={{ vendor|urlencode }}&category={{ active_category }}">Next</a>
           </li>
         </ul>
       </nav>
     </div>
 
-    <!-- Column 2: Invoice Details -->
-    <div class="col-4 border-end" style="max-height:85vh;overflow:auto;">
-      <h5>Invoice Details</h5>
-      <table class="table table-bordered table-sm">
+    <!-- Column 2: Details -->
+    <div class="col-4 border-end bg-white p-3 details-col">
+      <h6>Invoice Details</h6>
+      <table class="table table-sm table-bordered">
         <tbody id="invoiceDetailsTable">
           <tr><td colspan="2" class="text-muted">Select an invoice to view details</td></tr>
         </tbody>
       </table>
 
-      <h6>Line Items</h6>
-      <table class="table table-sm table-striped">
-        <thead>
-          <tr><th>Description</th><th>Net</th><th>VAT</th><th>Total</th></tr>
-        </thead>
-        <tbody id="invoiceLineItems">
-          <tr><td colspan="4" class="text-muted">No line items</td></tr>
-        </tbody>
-      </table>
+      <h6 class="mt-3">Line Items</h6>
+      <div style="max-height:36vh; overflow:auto;">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr><th>Description</th><th class="text-end">Net</th><th class="text-end">VAT</th><th class="text-end">Total</th></tr>
+          </thead>
+          <tbody id="invoiceLineItems">
+            <tr><td colspan="4" class="text-muted">No line items</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Column 3: PDF Viewer -->
-    <div class="col-4" style="height:85vh;">
-      <h5>Invoice PDF</h5>
-      <iframe id="pdfViewer" src="" style="width:100%;height:100%;border:none;"></iframe>
+    <div class="col-4 bg-white p-3 pdf-col">
+      <h6>Invoice PDF</h6>
+      <iframe id="pdfViewer" src="" style="width:100%;height:65vh;border:1px solid #ddd;border-radius:4px;"></iframe>
+      <div class="small-muted mt-2">If the PDF does not load, click "View" again or open the PDF in a new tab using the "Open" link in the details.</div>
     </div>
   </div>
 </div>
 
+<!-- Bootstrap + JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const pdfViewer = document.getElementById("pdfViewer");
+(function () {
+  // Utilities
+  function $(sel, root=document) { return root.querySelector(sel); }
+  function $all(sel, root=document) { return Array.from(root.querySelectorAll(sel)); }
 
-  // Handle "View" button: load details + PDF + highlight row
-  const detailButtons = document.querySelectorAll(".view-details");
-  detailButtons.forEach(button => {
-    button.addEventListener("click", async function () {
-      const docId = this.getAttribute("data-id");
-      const pdfFile = this.getAttribute("data-pdf");
+  // Select all checkbox
+  const selectAll = $('#selectAll');
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      $all('.inv-check').forEach(cb => cb.checked = this.checked);
+    });
+  }
 
-      // Highlight selected row
-      document.querySelectorAll("table tbody tr").forEach(r => r.classList.remove("selected-row"));
-      this.closest("tr").classList.add("selected-row");
+  // Row click highlight when "View" pressed
+  function clearHighlights() {
+    $all('tbody tr').forEach(r => r.classList.remove('selected-row'));
+  }
 
-      // Load PDF (works for both Azure Blob full URLs & local filenames)
-      if (pdfFile) {
-        if (pdfFile.startsWith("http")) {
-          pdfViewer.src = pdfFile;
+  // Handle view-details buttons
+  $all('.view-details').forEach(btn => {
+    btn.addEventListener('click', async function () {
+      const id = this.dataset.id;
+      const pdfRef = this.dataset.pdf;
+
+      // highlight
+      clearHighlights();
+      this.closest('tr').classList.add('selected-row');
+
+      // load PDF
+      if (pdfRef) {
+        if (pdfRef.startsWith('http://') || pdfRef.startsWith('https://')) {
+          $('#pdfViewer').src = pdfRef;
         } else {
-          pdfViewer.src = "/pdf/" + pdfFile;
+          $('#pdfViewer').src = '/pdf/' + encodeURIComponent(pdfRef);
         }
+      } else {
+        $('#pdfViewer').src = '';
       }
 
-      // Load details
+      // fetch JSON details
       try {
-        const res = await fetch(`/api/invoice/${docId}`);
+        const res = await fetch(`/api/invoice/${encodeURIComponent(id)}`);
         const data = await res.json();
-
         if (data.error) {
-          document.getElementById("invoiceDetailsTable").innerHTML =
-            `<tr><td colspan="2" class="text-danger">${data.error}</td></tr>`;
-          document.getElementById("invoiceLineItems").innerHTML = "";
+          $('#invoiceDetailsTable').innerHTML = `<tr><td colspan="2" class="text-danger">${data.error}</td></tr>`;
+          $('#invoiceLineItems').innerHTML = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
           return;
         }
 
         const inv = data.Invoice || {};
-        let html = "";
-        html += `<tr><th>Invoice #</th><td>${inv.InvoiceNumber || ""}</td></tr>`;
-        html += `<tr><th>Date</th><td>${inv.InvoiceDate || ""}</td></tr>`;
-        html += `<tr><th>Due Date</th><td>${inv.DueDate || ""}</td></tr>`;
-        html += `<tr><th>Vendor</th><td>${inv.Supplier?.Name || ""}</td></tr>`;
-        html += `<tr><th>Customer</th><td>${inv.Customer?.Name || ""}</td></tr>`;
-        html += `<tr><th>Currency</th><td>${inv.Currency || ""}</td></tr>`;
-        html += `<tr><th>Subtotal</th><td>${inv.SubTotal || ""}</td></tr>`;
-        html += `<tr><th>Tax</th><td>${inv.TaxAmount || ""}</td></tr>`;
-        html += `<tr><th>Total</th><td>${inv.InvoiceTotal || ""}</td></tr>`;
-        html += `<tr><th>Amount Due</th><td>${inv.AmountDue || ""}</td></tr>`;
-        document.getElementById("invoiceDetailsTable").innerHTML = html;
+        const formatRow = (k, v) => `<tr><th style="width:38%">${k}</th><td>${v ?? ''}</td></tr>`;
+        let html = '';
+        html += formatRow('Invoice #', inv.InvoiceNumber || '');
+        html += formatRow('Invoice Date', inv.InvoiceDate || '');
+        html += formatRow('Due Date', inv.DueDate || '');
+        html += formatRow('Vendor', inv.Supplier?.Name || '');
+        html += formatRow('Customer', inv.Customer?.Name || '');
+        html += formatRow('Currency', inv.Currency || '');
+        html += formatRow('Subtotal', inv.SubTotal || '');
+        html += formatRow('Tax', inv.TaxAmount || '');
+        html += formatRow('Total', inv.InvoiceTotal || '');
+        html += formatRow('Amount Due', inv.AmountDue || '');
+        html += `<tr><th>PDF</th><td><a href="${data.pdf_file || '#'}" target="_blank">Open PDF</a></td></tr>`;
 
-        // Line items
-        const lineItems = data.LineItems || [];
-        let lineHtml = "";
-        if (lineItems.length) {
-          lineItems.forEach(item => {
-            lineHtml += `<tr>
-              <td>${item.Description || ""}</td>
-              <td>${item.Net || ""}</td>
-              <td>${item.VAT || ""}</td>
-              <td>${item.Total || ""}</td>
-            </tr>`;
-          });
+        $('#invoiceDetailsTable').innerHTML = html;
+
+        // line items
+        const items = data.LineItems || [];
+        if (items.length) {
+          $('#invoiceLineItems').innerHTML = items.map(it => `
+            <tr>
+              <td>${it.Description || ''}</td>
+              <td class="text-end">${it.Net || ''}</td>
+              <td class="text-end">${it.VAT || ''}</td>
+              <td class="text-end">${it.Total || ''}</td>
+            </tr>
+          `).join('');
         } else {
-          lineHtml = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
+          $('#invoiceLineItems').innerHTML = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
         }
-        document.getElementById("invoiceLineItems").innerHTML = lineHtml;
 
       } catch (err) {
-        console.error("❌ Failed to fetch invoice:", err);
-        document.getElementById("invoiceDetailsTable").innerHTML =
-          `<tr><td colspan="2" class="text-danger">Error loading invoice details</td></tr>`;
+        console.error(err);
+        $('#invoiceDetailsTable').innerHTML = `<tr><td colspan="2" class="text-danger">Error loading invoice details</td></tr>`;
       }
     });
   });
 
-  // Purge button
-  const purgeBtn = document.getElementById("purgeBtn");
-  if (purgeBtn) {
-    purgeBtn.addEventListener("click", async function () {
-      if (!confirm("⚠️ This will delete ALL invoices and PDFs. Are you sure?")) return;
-      try {
-        const res = await fetch("/purge", { method: "POST" });
-        const data = await res.json();
-        if (data.success) {
-          alert(data.message);
-          window.location.reload();
-        } else {
-          alert("❌ Purge failed: " + data.message);
-        }
-      } catch (err) {
-        alert("❌ Purge request failed: " + err);
+  // Export Selected
+  $('#exportSelected').addEventListener('click', async function () {
+      const selected = $all('.inv-check:checked').map(cb => cb.value);
+      if (!selected.length) {
+          alert('Please select at least one invoice to export.');
+          return;
       }
-    });
-  }
-});
-</script>
 
+      try {
+          // POST to Excel export endpoint
+          const res = await fetch('/export_batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ invoices: selected })
+          });
+
+          if (!res.ok) {
+              const err = await res.json().catch(() => ({ message: res.statusText }));
+              alert('Export failed: ' + (err.message || res.statusText || 'Unknown'));
+              return;
+          }
+
+          // Read Excel file
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+
+          // Force XLSX filename (NOT ZIP)
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'FB60.xlsx';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+      } catch (err) {
+          console.error(err);
+          alert('Export request failed: ' + err.message);
+      }
+  });
+
+
+  // Purge button
+  const purgeBtn = document.getElementById('purgeBtn');
+  purgeBtn.addEventListener('click', async function () {
+    if (!confirm('⚠️ This will delete ALL invoices and PDFs. Are you sure?')) return;
+    try {
+      const res = await fetch('/purge', { method: 'POST' });
+      const j = await res.json();
+      if (j.success) {
+        alert(j.message || 'Purged');
+        window.location.reload();
+      } else {
+        alert('Purge failed: ' + (j.message || 'Unknown'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Purge request failed: ' + err.message);
+    }
+  });
+
+})();
+</script>
 </body>
 </html>

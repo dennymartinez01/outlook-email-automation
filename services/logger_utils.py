@@ -49,9 +49,9 @@ if not logger.handlers:
                         pass
 
             logger.addHandler(SeqHttpHandler())
-            logger.info(f"✅ Seq HTTP logging initialized at {SEQ_URL}")
+            logger.info(f" Seq HTTP logging initialized at {SEQ_URL}")
         except Exception as e:
-            logger.warning(f"⚠️ Could not initialize Seq HTTP logging: {e}")
+            logger.warning(f" Could not initialize Seq HTTP logging: {e}")
     else:
         logger.info("ℹ️ Seq logging not configured; using console and file output only.")
 
@@ -67,9 +67,9 @@ def with_retry(max_attempts=3, base_delay=1.0, backoff=2.0):
                 except Exception as e:
                     attempt += 1
                     if attempt >= max_attempts:
-                        logger.error(f"❌ Giving up after {attempt} attempts: {fn.__name__}")
+                        logger.error(f" Giving up after {attempt} attempts: {fn.__name__}")
                         raise
-                    logger.warning(f"⚠️ Retry {attempt}/{max_attempts} for {fn.__name__}: {e} — sleeping {delay:.2f}s")
+                    logger.warning(f" Retry {attempt}/{max_attempts} for {fn.__name__}: {e} — sleeping {delay:.2f}s")
                     time.sleep(delay)
                     delay *= backoff
         return wrapper
