@@ -207,9 +207,8 @@
         html += formatRow('Vendor', inv.Supplier?.Name || '');
         html += formatRow('Customer', inv.Customer?.Name || '');
         html += formatRow('Currency', inv.Currency || '');
-        html += formatRow('Subtotal', inv.SubTotal || '');
         html += formatRow('Tax', inv.TaxAmount || '');
-        html += formatRow('Total', inv.InvoiceTotal || '');
+        html += formatRow('Total', inv.SubTotal || '');
         html += formatRow('Amount Due', inv.AmountDue || '');
         html += `<tr><th>PDF</th><td><a href="${data.pdf_file || '#'}" target="_blank">Open PDF</a></td></tr>`;
 

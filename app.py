@@ -278,13 +278,15 @@ def invoices_v2():
     for doc in docs:
         inv = doc.get("invoice_data", {}) or {}
         total_data = inv.get("InvoiceTotal") or {}
+        net_total_data = inv.get("Subtotal") or {}
         invoices.append({
             "_id": str(doc.get("_id")),
             "invoice_no": inv.get("InvoiceId", "") or inv.get("InvoiceNumber", "") or "",
             "date": inv.get("InvoiceDate", ""),
             "vendor": (inv.get("VendorName") or "").replace("\n", " "),
             "customer": (inv.get("CustomerName") or "").replace("\n", " "),
-            "total": f"{total_data.get('symbol','')}{total_data.get('amount','')}" if isinstance(total_data, dict) else total_data,
+            # "total": f"{total_data.get('symbol','')}{total_data.get('amount','')}" if isinstance(total_data, dict) else total_data,
+            "total": f"{net_total_data.get('symbol', '')}{net_total_data.get('amount', '')}" if isinstance(net_total_data,dict) else net_total_data,
             "status": doc.get("status", ""),
             "pdf_file": doc.get("pdf_file", "")
         })
