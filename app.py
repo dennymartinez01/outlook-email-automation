@@ -277,8 +277,18 @@ def invoices_v2():
     invoices = []
     for doc in docs:
         inv = doc.get("invoice_data", {}) or {}
-        total_data = inv.get("InvoiceTotal") or {}
-        net_total_data = inv.get("Subtotal") or {}
+        # total_data = inv.get("InvoiceTotal") or {}
+        # net_total_data = inv.get("Subtotal") or {}
+
+        subtotal_data = inv.get("SubTotal") or {}
+
+        subtotal_amount = subtotal_data.get("amount", "")
+        subtotal_symbol = (
+                subtotal_data.get("symbol")
+                or inv.get("Currency")
+                or "£"
+        )
+
         invoices.append({
             "_id": str(doc.get("_id")),
             "invoice_no": inv.get("InvoiceId", "") or inv.get("InvoiceNumber", "") or "",
@@ -286,7 +296,7 @@ def invoices_v2():
             "vendor": (inv.get("VendorName") or "").replace("\n", " "),
             "customer": (inv.get("CustomerName") or "").replace("\n", " "),
             # "total": f"{total_data.get('symbol','')}{total_data.get('amount','')}" if isinstance(total_data, dict) else total_data,
-            "total": f"{net_total_data.get('symbol', '')}{net_total_data.get('amount', '')}" if isinstance(net_total_data,dict) else net_total_data,
+            "total": f"{subtotal_symbol}{subtotal_amount}",
             "status": doc.get("status", ""),
             "pdf_file": doc.get("pdf_file", "")
         })

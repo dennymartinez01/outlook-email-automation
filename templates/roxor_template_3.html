@@ -23,9 +23,6 @@
 <div class="container-fluid py-3">
   <div class="d-flex align-items-center mb-3">
     <h3 class="me-3">Extracted Invoices</h3>
-<!--    <div class="ms-auto">-->
-<!--      <button id="purgeBtn" class="btn btn-outline-danger btn-sm">Purge</button>-->
-<!--    </div>-->
   </div>
 
   <!-- Tabs -->
@@ -52,11 +49,10 @@
              placeholder="Search Vendor / Customer / Invoice #">
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-sm btn-primary">Search</button> &nbsp;  <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>
+      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+      &nbsp;
+      <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>
     </div>
-<!--    <div class="col-auto ms-auto">-->
-<!--      <button id="exportSelected" type="button" class="btn btn-success btn-sm">Export Selected</button>-->
-<!--    </div>-->
   </form>
 
   <!-- Main 3-column layout -->
@@ -140,7 +136,7 @@
     <div class="col-4 bg-white p-3 pdf-col">
       <h6>Invoice PDF</h6>
       <iframe id="pdfViewer" src="" style="width:100%;height:65vh;border:1px solid #ddd;border-radius:4px;"></iframe>
-      <div class="small-muted mt-2">If the PDF does not load, click "View" again or open the PDF in a new tab using the "Open" link in the details.</div>
+      <div class="small-muted mt-2">If the PDF does not load, click "View" again or open the PDF in a new tab using the "Open" link.</div>
     </div>
   </div>
 </div>
@@ -150,11 +146,10 @@
 
 <script>
 (function () {
-  // Utilities
+
   function $(sel, root=document) { return root.querySelector(sel); }
   function $all(sel, root=document) { return Array.from(root.querySelectorAll(sel)); }
 
-  // Select all checkbox
   const selectAll = $('#selectAll');
   if (selectAll) {
     selectAll.addEventListener('change', function () {
@@ -162,138 +157,126 @@
     });
   }
 
-  // Row click highlight when "View" pressed
   function clearHighlights() {
     $all('tbody tr').forEach(r => r.classList.remove('selected-row'));
   }
 
-  // Handle view-details buttons
+  // VIEW DETAILS
   $all('.view-details').forEach(btn => {
     btn.addEventListener('click', async function () {
       const id = this.dataset.id;
       const pdfRef = this.dataset.pdf;
 
-      // highlight
       clearHighlights();
       this.closest('tr').classList.add('selected-row');
 
-      // load PDF
       if (pdfRef) {
-        if (pdfRef.startsWith('http://') || pdfRef.startsWith('https://')) {
+        if (pdfRef.startsWith("http://") || pdfRef.startsWith("https://"))
           $('#pdfViewer').src = pdfRef;
-        } else {
-          $('#pdfViewer').src = '/pdf/' + encodeURIComponent(pdfRef);
-        }
+        else
+          $('#pdfViewer').src = "/pdf/" + encodeURIComponent(pdfRef);
       } else {
-        $('#pdfViewer').src = '';
+        $('#pdfViewer').src = "";
       }
 
-      // fetch JSON details
       try {
         const res = await fetch(`/api/invoice/${encodeURIComponent(id)}`);
         const data = await res.json();
         if (data.error) {
           $('#invoiceDetailsTable').innerHTML = `<tr><td colspan="2" class="text-danger">${data.error}</td></tr>`;
-          $('#invoiceLineItems').innerHTML = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
           return;
         }
 
         const inv = data.Invoice || {};
-        const formatRow = (k, v) => `<tr><th style="width:38%">${k}</th><td>${v ?? ''}</td></tr>`;
-        let html = '';
-        html += formatRow('Reference', inv.InvoiceNumber || '');
-        html += formatRow('Invoice Date', inv.InvoiceDate || '');
-        html += formatRow('Due Date', inv.DueDate || '');
-        html += formatRow('Vendor', inv.Supplier?.Name || '');
-        html += formatRow('Customer', inv.Customer?.Name || '');
-        html += formatRow('Currency', inv.Currency || '');
-        html += formatRow('Tax', inv.TaxAmount || '');
-        html += formatRow('Total', inv.SubTotal || '');
-        html += formatRow('Amount Due', inv.AmountDue || '');
-        html += `<tr><th>PDF</th><td><a href="${data.pdf_file || '#'}" target="_blank">Open PDF</a></td></tr>`;
+
+        // Currency symbol mapping
+        const symbols = {
+          "GBP": "£",
+          "USD": "$",
+          "EUR": "€",
+          "PHP": "₱",
+          "JPY": "¥",
+          "AUD": "A$",
+          "CAD": "C$"
+        };
+
+        const currencySymbol = symbols[inv.Currency] || inv.Currency || "";
+
+        function money(val) {
+          if (!val) return "";
+          return `${currencySymbol} ${val}`;
+        }
+
+        const formatRow = (k, v) =>
+          `<tr><th style="width:38%">${k}</th><td>${v ?? ''}</td></tr>`;
+
+        let html = "";
+        html += formatRow("Reference", inv.InvoiceNumber);
+        html += formatRow("Invoice Date", inv.InvoiceDate);
+        html += formatRow("Due Date", inv.DueDate);
+        html += formatRow("Vendor", inv.Supplier?.Name);
+        html += formatRow("Customer", inv.Customer?.Name);
+        html += formatRow("Currency", currencySymbol);
+        html += formatRow("Subtotal", money(inv.SubTotal));
+        html += formatRow("Tax", money(inv.TaxAmount));
+        html += formatRow("Amount Due", money(inv.AmountDue));
+        html += `<tr><th>PDF</th><td><a href="${data.pdf_file}" target="_blank">Open PDF</a></td></tr>`;
 
         $('#invoiceDetailsTable').innerHTML = html;
 
-        // line items
+        // Line items
         const items = data.LineItems || [];
         if (items.length) {
           $('#invoiceLineItems').innerHTML = items.map(it => `
             <tr>
               <td>${it.Description || ''}</td>
-              <td class="text-end">${it.Net || ''}</td>
-              <td class="text-end">${it.VAT || ''}</td>
-              <td class="text-end">${it.Total || ''}</td>
+              <td class="text-end">${money(it.Net)}</td>
+              <td class="text-end">${money(it.VAT)}</td>
+              <td class="text-end">${money(it.Total)}</td>
             </tr>
           `).join('');
         } else {
-          $('#invoiceLineItems').innerHTML = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
+          $('#invoiceLineItems').innerHTML =
+            `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
         }
 
       } catch (err) {
         console.error(err);
-        $('#invoiceDetailsTable').innerHTML = `<tr><td colspan="2" class="text-danger">Error loading invoice details</td></tr>`;
+        $('#invoiceDetailsTable').innerHTML =
+          `<tr><td colspan="2" class="text-danger">Error loading invoice details</td></tr>`;
       }
     });
   });
 
-  // Export Selected
+  // Export
   $('#exportSelected').addEventListener('click', async function () {
-      const selected = $all('.inv-check:checked').map(cb => cb.value);
-      if (!selected.length) {
-          alert('Please select at least one invoice to export.');
-          return;
-      }
+    const selected = $all('.inv-check:checked').map(cb => cb.value);
+    if (!selected.length) return alert("Please select at least one invoice.");
 
-      try {
-          // POST to Excel export endpoint
-          const res = await fetch('/export_batch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ invoices: selected })
-          });
-
-          if (!res.ok) {
-              const err = await res.json().catch(() => ({ message: res.statusText }));
-              alert('Export failed: ' + (err.message || res.statusText || 'Unknown'));
-              return;
-          }
-
-          // Read Excel file
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-
-          // Force XLSX filename (NOT ZIP)
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'FB60.xlsx';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-
-      } catch (err) {
-          console.error(err);
-          alert('Export request failed: ' + err.message);
-      }
-  });
-
-
-  // Purge button
-  const purgeBtn = document.getElementById('purgeBtn');
-  purgeBtn.addEventListener('click', async function () {
-    if (!confirm('⚠️ This will delete ALL invoices and PDFs. Are you sure?')) return;
     try {
-      const res = await fetch('/purge', { method: 'POST' });
-      const j = await res.json();
-      if (j.success) {
-        alert(j.message || 'Purged');
-        window.location.reload();
-      } else {
-        alert('Purge failed: ' + (j.message || 'Unknown'));
+      const res = await fetch('/export_batch', {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({invoices: selected})
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({message: "Unknown error"}));
+        alert("Export failed: " + err.message);
+        return;
       }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "FB60.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+
     } catch (err) {
       console.error(err);
-      alert('Purge request failed: ' + err.message);
+      alert("Export request failed: " + err.message);
     }
   });
 
