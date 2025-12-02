@@ -6137,3 +6137,37 @@ ModuleNotFoundError: No module named 'pandas'
 2025-12-02 22:12:40,506 [INFO] No new messages found since last checkpoint.
 2025-12-02 22:12:48,549 [INFO] No new messages for CustomerOrders@roxorgroup.com
 2025-12-02 22:13:11,641 [INFO] Stopping background worker...
+2025-12-02 22:13:21,961 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-02 22:13:26,495 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-12-02 22:13:26,495 [INFO] Started background invoice-checker thread.
+2025-12-02 22:13:31,660 [INFO]  Microsoft Graph token acquired.
+2025-12-02 22:13:34,575 [INFO] Starting Flask on port 5000 (debug=True)
+2025-12-02 22:13:38,598 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-12-02 22:13:44,149 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-02 22:13:48,437 [INFO]  Retrieved 4 new messages from Graph
+2025-12-02 22:13:48,613 [INFO] Background invoice monitor starting (interval=180 seconds)
+2025-12-02 22:13:48,613 [INFO] Started background invoice-checker thread.
+2025-12-02 22:13:52,451 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:13:53,443 [INFO]  Microsoft Graph token acquired.
+2025-12-02 22:13:56,666 [INFO] Starting Flask on port 5000 (debug=True)
+2025-12-02 22:14:00,500 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-12-02 22:14:00,688 [INFO] Checking inbox=NonStockSupplierInvoices@roxorgroup.com for category=nonstock
+2025-12-02 22:14:04,531 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-12-02 22:14:09,211 [INFO]  Retrieved 0 new messages from Graph
+2025-12-02 22:14:10,327 [INFO]  Retrieved 4 new messages from Graph
+2025-12-02 22:14:13,238 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:14:14,347 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:14:21,297 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-12-02 22:14:22,394 [INFO] No new messages for NonStockSupplierInvoices@roxorgroup.com
+2025-12-02 22:14:25,330 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-12-02 22:14:26,413 [INFO] Checking inbox=StockSupplierInvoices@roxorgroup.com for category=stock
+2025-12-02 22:14:29,991 [INFO]  Retrieved 0 new messages from Graph
+2025-12-02 22:14:30,973 [INFO]  Retrieved 0 new messages from Graph
+2025-12-02 22:14:34,005 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:14:35,002 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:14:42,049 [INFO] No new messages for CustomerOrders@roxorgroup.com
+2025-12-02 22:14:43,039 [INFO] No new messages for StockSupplierInvoices@roxorgroup.com
+2025-12-02 22:14:47,063 [INFO] Checking inbox=CustomerOrders@roxorgroup.com for category=customer
+2025-12-02 22:14:51,632 [INFO]  Retrieved 0 new messages from Graph
+2025-12-02 22:14:55,661 [INFO] No new messages found since last checkpoint.
+2025-12-02 22:15:03,678 [INFO] No new messages for CustomerOrders@roxorgroup.com

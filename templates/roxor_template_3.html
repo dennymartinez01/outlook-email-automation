@@ -217,9 +217,8 @@
         html += formatRow("Vendor", inv.Supplier?.Name);
         html += formatRow("Customer", inv.Customer?.Name);
         html += formatRow("Currency", currencySymbol);
-        html += formatRow("Subtotal", money(inv.SubTotal));
+        html += formatRow("Total", money(inv.SubTotal));
         html += formatRow("Tax", money(inv.TaxAmount));
-        html += formatRow("Amount Due", money(inv.AmountDue));
         html += `<tr><th>PDF</th><td><a href="${data.pdf_file}" target="_blank">Open PDF</a></td></tr>`;
 
         $('#invoiceDetailsTable').innerHTML = html;
