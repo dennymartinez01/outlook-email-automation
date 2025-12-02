@@ -68,7 +68,7 @@
           <thead>
             <tr>
               <th class="checkbox-cell"><input id="selectAll" type="checkbox" title="Select all"></th>
-              <th class="nowrap">Invoice #</th>
+              <th class="nowrap">Reference</th>
               <th class="nowrap">Date</th>
               <th>Vendor</th>
               <th class="text-end nowrap">Total</th>
@@ -201,7 +201,7 @@
         const inv = data.Invoice || {};
         const formatRow = (k, v) => `<tr><th style="width:38%">${k}</th><td>${v ?? ''}</td></tr>`;
         let html = '';
-        html += formatRow('Invoice #', inv.InvoiceNumber || '');
+        html += formatRow('Reference', inv.InvoiceNumber || '');
         html += formatRow('Invoice Date', inv.InvoiceDate || '');
         html += formatRow('Due Date', inv.DueDate || '');
         html += formatRow('Vendor', inv.Supplier?.Name || '');
