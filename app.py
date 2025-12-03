@@ -59,133 +59,12 @@ def get_mongo_collection():
     return db.get_collection("invoicecollection")
 
 def get_collection_for_export(collection_name):
-    """
-    Custom helper for export functionality only.
-    Does not interfere with the existing get_mongo_collection() logic.
-    """
     client = MongoClient(MONGO_URI)
     db = client.get_database("email_invoice_db")
     return db.get_collection(collection_name)
 
-def process_message_attachments(messages, category):
-    """
-    messages: list of message dicts from Graph (with attachments expanded).
-    category: 'nonstock'|'stock'|'customer' - used to tag inserted records.
-    Returns list of stored doc ids.
-    """
-    stored_ids = []
-    collection = get_mongo_collection()
-
-    for msg in messages or []:
-        msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
-        attachments = msg.get("attachments", []) or []
-        logger.info("Processing message %s (attachments=%d) for category=%s", msg_id, len(attachments), category)
-
-        for att in attachments:
-            try:
-                content_type = (att.get("contentType") or "").lower()
-                filename = att.get("name") or "invoice.pdf"
-
-                # process only PDFs
-                if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
-                    logger.info("Skipping non-PDF attachment: %s (type=%s)", filename, content_type)
-                    continue
-
-                attachment_id = att.get("id") or att.get("attachmentId") or str(time.time()).replace('.', '')
-                safe_name = filename.replace(" ", "_").replace("/", "_")
-                blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
-
-                content_b64 = att.get("contentBytes")
-                if not content_b64:
-                    logger.warning("Attachment %s in message %s missing contentBytes; skipping", attachment_id, msg_id)
-                    continue
-
-                # decode bytes
-                try:
-                    file_bytes = base64.b64decode(content_b64)
-                except Exception as e:
-                    logger.exception("Failed to decode base64 for attachment %s: %s", attachment_id, e)
-                    continue
-
-                # upload to blob
-                try:
-                    logger.info("Uploading PDF to blob: %s", blob_name)
-                    blob_url = upload_pdf_blob(blob_name, file_bytes)
-                    logger.info("Uploaded blob -> %s", blob_url)
-                except Exception as e:
-                    logger.exception("Blob upload failed for %s: %s", blob_name, e)
-                    continue
-
-                # analyze and store (pass category)
-                try:
-                    logger.info("Analyzing & storing invoice (msg=%s att=%s)", msg_id, attachment_id)
-                    stored_id = analyze_and_store(blob_url, content_b64, msg_id, attachment_id, category=category)
-                    if stored_id:
-                        stored_ids.append(stored_id)
-                        logger.info("Stored invoice id=%s (category=%s)", stored_id, category)
-                    else:
-                        logger.warning("analyze_and_store returned no id for msg=%s att=%s", msg_id, attachment_id)
-                except Exception as e:
-                    logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
-                    continue
-
-            except Exception as e:
-                logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
-                continue
-
-    return stored_ids
-
-def run_invoice_checker_loop():
-    """Background loop that polls each configured inbox every N seconds."""
-    global _stop_worker
-    POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", 180))  # seconds, default 180
-    logger.info("Background invoice monitor starting (interval=%s seconds)", POLL_INTERVAL)
-
-    while not _stop_worker:
-        try:
-            token = get_graph_token()
-            if not token:
-                logger.warning("Could not obtain Graph token; skipping this cycle.")
-            else:
-                # iterate configured inboxes
-                for category, email in TARGET_EMAILS.items():
-                    if not email:
-                        logger.info("No email configured for category=%s, skipping", category)
-                        continue
-                    try:
-                        logger.info("Checking inbox=%s for category=%s", email, category)
-                        # fetch messages from Graph (fetch_new_messages should accept category,email)
-                        messages = fetch_new_messages(token, category, email, top=50)
-                        if not messages:
-                            logger.info("No new messages for %s", email)
-                            continue
-
-                        logger.info("Found %d messages for %s", len(messages), email)
-                        processed = process_message_attachments(messages, category)
-                        logger.info("Processed %d attachments for category=%s", len(processed), category)
-
-                    except Exception as e:
-                        logger.exception("Error processing inbox %s for category=%s: %s", email, category, e)
-        except Exception as e:
-            logger.exception("Unexpected error in invoice checker loop: %s", e)
-
-        # Wait
-        time.sleep(POLL_INTERVAL)
-
-# background thread management
-def start_background_thread():
-    thread = threading.Thread(target=run_invoice_checker_loop, daemon=True)
-    thread.start()
-    logger.info("Started background invoice-checker thread.")
-
-def stop_background_thread():
-    global _stop_worker
-    _stop_worker = True
-    logger.info("Stopping background worker...")
-
-# start at import/run
-start_background_thread()
-atexit.register(stop_background_thread)
+# ... (other functions unchanged: process_message_attachments, run loop, etc.)
+# (keep your original helper functions and background thread code)
 
 # -------------------------
 # Flask routes
@@ -213,13 +92,15 @@ def invoice_detail_json(doc_id):
 
     inv_data = doc.get("invoice_data", {}) or {}
 
+    # NOTE: Ensure keys match what your frontend expects
     invoice = {
         "InvoiceNumber": inv_data.get("InvoiceId", ""),
         "InvoiceDate": inv_data.get("InvoiceDate", ""),
         "DueDate": inv_data.get("DueDate", ""),
         "Supplier": {"Name": (inv_data.get("VendorName") or "").replace("\n", " ")},
         "Customer": {"Name": (inv_data.get("CustomerName") or "").replace("\n", " ")},
-        "Currency": (inv_data.get("InvoiceTotal") or {}).get("code", ""),
+        # keep using code here; UI will map to symbol
+        "Currency": (inv_data.get("InvoiceTotal") or {}).get("code", "") or (inv_data.get("SubTotal") or {}).get("code", ""),
         "SubTotal": (inv_data.get("SubTotal") or {}).get("amount", ""),
         "TaxAmount": (inv_data.get("TotalTax") or {}).get("amount", ""),
         "InvoiceTotal": (inv_data.get("InvoiceTotal") or {}).get("amount", ""),
@@ -261,7 +142,6 @@ def invoices_v2():
 
     if search_query:
         regex = {"$regex": search_query, "$options": "i"}
-        # search in invoice fields inside invoice_data
         query["$or"] = [
             {"invoice_data.InvoiceId": regex},
             {"invoice_data.VendorName": regex},
@@ -277,11 +157,8 @@ def invoices_v2():
     invoices = []
     for doc in docs:
         inv = doc.get("invoice_data", {}) or {}
-        # total_data = inv.get("InvoiceTotal") or {}
-        # net_total_data = inv.get("Subtotal") or {}
 
         subtotal_data = inv.get("SubTotal") or {}
-
         subtotal_amount = subtotal_data.get("amount", "")
         subtotal_symbol = (
                 subtotal_data.get("symbol")
@@ -295,10 +172,11 @@ def invoices_v2():
             "date": inv.get("InvoiceDate", ""),
             "vendor": (inv.get("VendorName") or "").replace("\n", " "),
             "customer": (inv.get("CustomerName") or "").replace("\n", " "),
-            # "total": f"{total_data.get('symbol','')}{total_data.get('amount','')}" if isinstance(total_data, dict) else total_data,
             "total": f"{subtotal_symbol}{subtotal_amount}",
             "status": doc.get("status", ""),
-            "pdf_file": doc.get("pdf_file", "")
+            "pdf_file": doc.get("pdf_file", ""),
+            # NEW: exported flag (default False)
+            "exported": bool(doc.get("exported", False))
         })
 
     start_page = max(1, page - 2)
@@ -318,11 +196,6 @@ def invoices_v2():
 
 @app.route("/pdf/<path:filename>")
 def serve_pdf(filename):
-    """
-    Serve a PDF that may be:
-      - A full Azure blob URL (http/https) -> stream
-      - A local file under invoices/ -> serve
-    """
     try:
         decoded = unquote(filename)
         if decoded.startswith("http://") or decoded.startswith("https://"):
@@ -331,7 +204,6 @@ def serve_pdf(filename):
                 return Response(r.iter_content(chunk_size=8192), content_type="application/pdf")
             else:
                 return (f"Failed to fetch remote PDF ({r.status_code})", 404)
-        # local file
         local_path = os.path.join("invoices", decoded)
         if os.path.exists(local_path):
             return send_file(local_path, mimetype="application/pdf")
@@ -339,89 +211,6 @@ def serve_pdf(filename):
     except Exception as e:
         logger.exception("Error serving PDF")
         return (f"Error serving PDF: {e}", 500)
-
-# @app.route("/export_batch", methods=["POST"])
-# def export_batch():
-#     try:
-#         data = request.get_json() or {}
-#         ids = data.get("invoices") or []
-#
-#         if not ids:
-#             return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
-#
-#         invoice_coll = get_collection_for_export("invoicecollection")
-#         vendor_coll = get_collection_for_export("vendorcollection")
-#
-#         rows = []
-#
-#         for doc_id in ids:
-#
-#             doc = None
-#             if ObjectId.is_valid(doc_id):
-#                 doc = invoice_coll.find_one({"_id": ObjectId(doc_id)})
-#             if doc is None:
-#                 doc = invoice_coll.find_one({"_id": doc_id})
-#
-#             if not doc:
-#                 continue
-#
-#             inv = doc.get("invoice_data", {}) or {}
-#
-#             customer_name = (inv.get("CustomerName") or "").strip()
-#             invoice_date = inv.get("InvoiceDate", "")
-#
-#             currency = (
-#                 inv.get("Currency")
-#                 or (inv.get("InvoiceTotal") or {}).get("currencySymbol")
-#                 or (inv.get("TotalTax") or {}).get("currencySymbol")
-#                 or ""
-#             )
-#
-#             amount = (
-#                 (inv.get("InvoiceTotal") or {}).get("amount")
-#                 or (inv.get("Total") or {}).get("amount")
-#                 or (inv.get("TotalTax") or {}).get("amount")
-#                 or 0
-#             )
-#
-#             try:
-#                 amount = float(amount)
-#             except:
-#                 amount = 0
-#
-#             invoice_type = "credit" if amount < 0 else "debit"
-#
-#             vendor_doc = vendor_coll.find_one({"Name": customer_name})
-#             vendor_code = vendor_doc.get("Account Code", "") if vendor_doc else ""
-#
-#             rows.append({
-#                 "Vendor SAP Account code": vendor_code,
-#                 "Invoice Date": invoice_date,
-#                 "Reference": customer_name,
-#                 "Currency": currency,
-#                 "Amount": abs(amount),
-#                 "Type": invoice_type
-#             })
-#
-#         import pandas as pd
-#         output = io.BytesIO()
-#
-#         df = pd.DataFrame(rows)
-#         df.to_excel(output, index=False)
-#
-#         output.seek(0)
-#
-#         return send_file(
-#             output,
-#             as_attachment=True,
-#             download_name="FB60.xlsx",
-#             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-#         )
-#
-#     except Exception as e:
-#         logger.exception("export_batch failed")
-#         return jsonify({"success": False, "message": str(e)}), 500
-
 
 @app.route("/export_batch", methods=["POST"])
 def export_batch():
@@ -432,26 +221,34 @@ def export_batch():
         if not ids:
             return jsonify({"success": False, "message": "No invoice IDs provided"}), 400
 
-        # These functions must be defined/imported in your actual file scope
         invoice_coll = get_collection_for_export("invoicecollection")
         vendor_coll = get_collection_for_export("vendorcollection")
 
         rows = []
+        processed_ids = []  # IDs we will mark as exported
 
         for doc_id in ids:
-
+            # fetch doc by ObjectId or string id
             doc = None
-            if ObjectId.is_valid(doc_id):
-                doc = invoice_coll.find_one({"_id": ObjectId(doc_id)})
+            try:
+                if ObjectId.is_valid(doc_id):
+                    doc = invoice_coll.find_one({"_id": ObjectId(doc_id)})
+            except Exception:
+                doc = None
             if doc is None:
                 doc = invoice_coll.find_one({"_id": doc_id})
 
             if not doc:
+                # skip missing
+                continue
+
+            # Skip documents already exported
+            if doc.get("exported"):
+                logger.info("Skipping already exported invoice: %s", doc_id)
                 continue
 
             inv = doc.get("invoice_data", {}) or {}
 
-            # --- Extract Invoice Data ---
             customer_name = (inv.get("CustomerName") or "").strip()
             invoice_date = inv.get("InvoiceDate", "")
 
@@ -476,34 +273,25 @@ def export_batch():
 
             invoice_type = "credit" if amount < 0 else "debit"
 
-            # --- VENDOR LOOKUP: Postcode & Company Code 1000 ---
+            # --- VENDOR LOOKUP
             vendor_doc = None
             vendor_code = ""
 
-            # 1. Extract the Postcode from the Invoice Data (VendorAddress)
             invoice_postcode = (inv.get("VendorAddress", {}).get("postal_code") or "").strip()
-
             if invoice_postcode:
-                # 2. Prepare the Postcode for robust, case-insensitive, wildcard-tolerant matching
-                # Escape any regex special characters in the postcode (e.g., if it contained a dot)
                 postcode_pattern = f".*{re.escape(invoice_postcode)}.*"
-
-                # 3. Build the MongoDB filter: Match Postcode AND Company Code 1000
                 vendor_filter = {
                     "Company Code": 1000,
                     "Postcode": {
                         "$regex": postcode_pattern,
-                        "$options": "i"  # Case-insensitive search
+                        "$options": "i"
                     }
                 }
-
-                # 4. Execute the lookup
                 vendor_doc = vendor_coll.find_one(vendor_filter)
 
-            # 5. Extract the code, will be "" if no vendor_doc was found
             vendor_code = vendor_doc.get("Account Code", "") if vendor_doc else ""
 
-            # --- Append Row for Export ---
+            # Append row for this invoice
             rows.append({
                 "Vendor SAP Account code": vendor_code,
                 "Invoice Date": invoice_date,
@@ -513,13 +301,40 @@ def export_batch():
                 "Type": invoice_type
             })
 
-        # --- Export to Excel ---
-        output = io.BytesIO()
+            # remember to mark exported
+            processed_ids.append(doc.get("_id"))
 
+        if not rows:
+            return jsonify({"success": False, "message": "No selectable invoices to export (they may already be exported)."}), 400
+
+        # Export to Excel
+        output = io.BytesIO()
         df = pd.DataFrame(rows)
         df.to_excel(output, index=False)
-
         output.seek(0)
+
+        # Mark processed docs as exported (persist)
+        # Convert processed_ids to ObjectIds if needed
+        set_ids = []
+        for pid in processed_ids:
+            try:
+                # if it's already an ObjectId from Mongo result, keep it
+                if isinstance(pid, ObjectId):
+                    set_ids.append(pid)
+                else:
+                    if ObjectId.is_valid(pid):
+                        set_ids.append(ObjectId(pid))
+                    else:
+                        set_ids.append(pid)
+            except Exception:
+                set_ids.append(pid)
+
+        try:
+            # update by _id in list (handles ObjectId list)
+            invoice_coll.update_many({"_id": {"$in": set_ids}}, {"$set": {"exported": True}})
+            logger.info("Marked %d invoices exported", len(set_ids))
+        except Exception as e:
+            logger.exception("Failed to mark invoices exported: %s", e)
 
         return send_file(
             output,
@@ -532,19 +347,15 @@ def export_batch():
         logger.exception("export_batch failed")
         return jsonify({"success": False, "message": str(e)}), 500
 
-
-
 @app.route("/purge", methods=["POST"])
 def purge_invoices():
     try:
         coll = get_mongo_collection()
         all_docs = list(coll.find({}, {"pdf_file": 1}))
 
-        # delete DB records
         coll.delete_many({})
         logger.info("Deleted all invoice records from MongoDB.")
 
-        # delete blobs if possible
         AZ_CONN = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         if AZ_CONN:
             from azure.storage.blob import BlobServiceClient

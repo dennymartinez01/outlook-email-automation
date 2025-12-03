@@ -68,23 +68,35 @@
               <th class="nowrap">Date</th>
               <th>Vendor</th>
               <th class="text-end nowrap">Net</th>
+              <!-- NEW Exported column -->
+              <th class="text-center nowrap">Exported</th>
               <th class="text-center">Action</th>
             </tr>
           </thead>
           <tbody>
             {% for inv in invoices %}
             <tr data-id="{{ inv._id }}">
-              <td class="checkbox-cell"><input type="checkbox" class="inv-check" value="{{ inv._id }}"></td>
+              <td class="checkbox-cell">
+                <input type="checkbox" class="inv-check" value="{{ inv._id }}"
+                       {% if inv.exported %}disabled{% endif %}>
+              </td>
               <td class="nowrap">{{ inv.invoice_no }}</td>
               <td class="nowrap">{{ inv.date }}</td>
               <td>{{ inv.vendor }}</td>
               <td class="text-end">{{ inv.total }}</td>
               <td class="text-center">
+                {% if inv.exported %}
+                  <span class="text-success" title="Exported">✔</span>
+                {% else %}
+                  &nbsp;
+                {% endif %}
+              </td>
+              <td class="text-center">
                 <button type="button" class="btn btn-sm btn-primary view-details" data-id="{{ inv._id }}" data-pdf="{{ inv.pdf_file }}">View</button>
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="text-center text-muted">No invoices found</td></tr>
+            <tr><td colspan="7" class="text-center text-muted">No invoices found</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -153,7 +165,10 @@
   const selectAll = $('#selectAll');
   if (selectAll) {
     selectAll.addEventListener('change', function () {
-      $all('.inv-check').forEach(cb => cb.checked = this.checked);
+      // only toggle enabled checkboxes
+      $all('.inv-check').forEach(cb => {
+        if (!cb.disabled) cb.checked = this.checked;
+      });
     });
   }
 
@@ -184,6 +199,7 @@
         const data = await res.json();
         if (data.error) {
           $('#invoiceDetailsTable').innerHTML = `<tr><td colspan="2" class="text-danger">${data.error}</td></tr>`;
+          $('#invoiceLineItems').innerHTML = `<tr><td colspan="4" class="text-muted">No line items</td></tr>`;
           return;
         }
 
@@ -217,8 +233,9 @@
         html += formatRow("Vendor", inv.Supplier?.Name);
         html += formatRow("Customer", inv.Customer?.Name);
         html += formatRow("Currency", currencySymbol);
-        html += formatRow("Total", money(inv.SubTotal));
+        html += formatRow("Subtotal", money(inv.SubTotal));
         html += formatRow("Tax", money(inv.TaxAmount));
+        html += formatRow("Amount Due", money(inv.AmountDue));
         html += `<tr><th>PDF</th><td><a href="${data.pdf_file}" target="_blank">Open PDF</a></td></tr>`;
 
         $('#invoiceDetailsTable').innerHTML = html;
@@ -249,8 +266,9 @@
 
   // Export
   $('#exportSelected').addEventListener('click', async function () {
-    const selected = $all('.inv-check:checked').map(cb => cb.value);
-    if (!selected.length) return alert("Please select at least one invoice.");
+    // only include non-disabled (not yet exported) checked checkboxes
+    const selected = $all('.inv-check:checked').filter(cb => !cb.disabled).map(cb => cb.value);
+    if (!selected.length) return alert("No selectable invoices selected (they may already be exported).");
 
     try {
       const res = await fetch('/export_batch', {
@@ -272,6 +290,9 @@
       a.download = "FB60.xlsx";
       a.click();
       URL.revokeObjectURL(url);
+
+      // reload to reflect exported status
+      window.location.reload();
 
     } catch (err) {
       console.error(err);
