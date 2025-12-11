@@ -6262,3 +6262,11 @@ ModuleNotFoundError: No module named 'pandas'
 2025-12-03 22:58:50,733 [INFO]  Seq HTTP logging initialized at http://localhost:5341
 2025-12-03 22:58:55,261 [INFO] Starting Flask on port 5000 (debug=True)
 2025-12-03 22:59:20,364 [INFO] Marked 1 invoices exported
+2025-12-10 17:13:08,813 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-10 17:13:17,601 [INFO] Starting Flask on port 5000 (debug=True)
+2025-12-10 17:13:24,422 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-10 17:13:29,132 [INFO] Starting Flask on port 5000 (debug=True)
+2025-12-10 17:13:52,811 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-10 17:13:57,669 [INFO] Starting Flask on port 5000 (debug=True)
+2025-12-10 17:14:17,038 [INFO]  Seq HTTP logging initialized at http://localhost:5341
+2025-12-10 17:14:21,537 [INFO] Starting Flask on port 5000 (debug=True)

@@ -78,122 +78,121 @@ def get_graph_token() -> str:
 # ---------------------------------------------------------------------
 def check_emails(token: str, top: int = 50) -> List[str]:
     """
-    Fetch new messages and process any PDF attachments.
-
-    Flow per email:
-      1. Fetch via Graph API (using services.azure_graph_service)
-      2. For each PDF attachment:
-           • Decode Base64 to raw bytes
-           • Upload PDF to Blob via upload_pdf_blob()
-           • Analyze + store results using analyze_and_store()
-      3. Return list of stored document IDs
+    Fetch new messages from ALL 3 inbox categories and process their PDF attachments.
+    Returns list of stored MongoDB document IDs.
     """
+
     processed_docs: List[str] = []
 
     if not token:
-        logger.error(" No Graph token provided to check_emails()")
+        logger.error("No Graph token provided to check_emails()")
         return processed_docs
 
-    # Fetch messages with attachments
-    try:
-        target_emails = {
-            "nonstock": os.getenv("TARGET_EMAIL_NONSTOCK"),
-            "stock": os.getenv("TARGET_EMAIL_STOCK"),
-            "customer": os.getenv("TARGET_EMAIL_CUSTOMER")
-        }
+    # THREE TARGET INBOXES
+    target_emails = {
+        "nonstock": os.getenv("TARGET_EMAIL_NONSTOCK"),
+        "stock": os.getenv("TARGET_EMAIL_STOCK"),
+        "customer": os.getenv("TARGET_EMAIL_CUSTOMER")
+    }
 
-        for category, email in target_emails.items():
+    # MAIN LOOP (FIXED)
+    for category, email in target_emails.items():
 
-            if not email:
-                logger.warning(f"No inbox configured for category: {category}")
-                continue
+        if not email:
+            logger.warning(f"No inbox configured for category: {category}")
+            continue
 
-            logger.info(f" Checking inbox for category={category}: {email}")
+        logger.info(f"📬 Checking inbox for category={category}: {email}")
 
-            try:
-                messages = fetch_new_messages(token, category, email, top=top)
-            except Exception as e:
-                logger.exception(f"Failed to fetch messages for {category}: {e}")
-                continue
+        # FETCH EMAILS FOR THIS CATEGORY
+        try:
+            messages = fetch_new_messages(token, category, email, top=top)
+        except Exception as e:
+            logger.exception(f"Failed to fetch messages for {category}: {e}")
+            continue
 
-            logger.info(f" Retrieved {len(messages)} new messages for category={category}")
+        logger.info(f"📥 Retrieved {len(messages)} messages for category={category}")
 
-            # existing message loop (move inside this loop)
+        # --------------------------------------------
+        # FIX: PROCESS MESSAGES *INSIDE* THE LOOP
+        # --------------------------------------------
 
-    except Exception as e:
-        logger.exception("Failed to fetch messages from Graph: %s", e)
-        return processed_docs
+        for msg in messages or []:
+            msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
+            attachments = msg.get("attachments", [])
+            logger.info(
+                f"Processing message {msg_id} in category={category} with {len(attachments)} attachment(s)"
+            )
 
-    msg_count = len(messages or [])
-    logger.info("📬 Retrieved %d new messages from Graph", msg_count)
-
-    for msg in messages or []:
-        msg_id = msg.get("id") or msg.get("messageId") or "unknown-msg"
-        attachments = msg.get("attachments", [])
-        logger.info("Processing message %s with %d attachment(s)", msg_id, len(attachments))
-
-        for att in attachments:
-            try:
-                content_type = att.get("contentType", "").lower()
-                filename = att.get("name") or "invoice.pdf"
-
-                # Only process PDF attachments
-                if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
-                    logger.info("Skipping non-PDF attachment: %s (type=%s)", filename, content_type)
-                    continue
-
-                attachment_id = att.get("id") or att.get("attachmentId") or "unknown-att"
-                safe_name = filename.replace(" ", "_").replace("/", "_")
-                blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
-
-                content_b64 = att.get("contentBytes")
-                if not content_b64:
-                    logger.warning("Attachment %s in message %s has no contentBytes; skipping", attachment_id, msg_id)
-                    continue
-
-                # --- Decode base64 into real PDF bytes ---
+            for att in attachments:
                 try:
-                    file_bytes = base64.b64decode(content_b64)
+                    content_type = att.get("contentType", "").lower()
+                    filename = att.get("name") or "invoice.pdf"
+
+                    # Process only PDFs
+                    if not (content_type == "application/pdf" or filename.lower().endswith(".pdf")):
+                        logger.info(f"Skipping non-PDF attachment: {filename}")
+                        continue
+
+                    attachment_id = att.get("id") or att.get("attachmentId") or "unknown-att"
+                    safe_name = filename.replace(" ", "_").replace("/", "_")
+                    blob_name = f"{msg_id}_{attachment_id}_{safe_name}"
+
+                    # Decode Base64
+                    content_b64 = att.get("contentBytes")
+                    if not content_b64:
+                        logger.warning(f"Attachment {attachment_id} has no contentBytes; skipping")
+                        continue
+
+                    try:
+                        file_bytes = base64.b64decode(content_b64)
+                    except Exception as e:
+                        logger.error(f"Base64 decode failed for {attachment_id}: {e}")
+                        continue
+
+                    # Upload to Blob
+                    try:
+                        logger.info(f"Uploading blob: {blob_name}")
+                        blob_url = upload_pdf_blob(blob_name, file_bytes)
+                        logger.info(f"Blob uploaded: {blob_url}")
+                    except Exception as e:
+                        logger.exception(f"Blob upload failed for {blob_name}: {e}")
+                        continue
+
+                    # Analyze + Store
+                    try:
+                        logger.info(f"Analyzing invoice: {filename} (category={category})")
+
+                        result = analyze_and_store(
+                            blob_url,
+                            content_b64,
+                            msg_id,
+                            attachment_id,
+                            category=category     # ← IMPORTANT
+                        )
+
+                        if result:
+                            safe_result = sanitize_for_mongo(result)
+                            processed_docs.append(safe_result.get("_id") or safe_result)
+                            logger.info(f"Stored invoice successfully: {safe_result.get('_id')}")
+                        else:
+                            logger.warning(f"No result returned for {filename}")
+
+                    except Exception as e:
+                        logger.exception(
+                            f"Analysis/storage failed for msg={msg_id}, att={attachment_id}: {e}"
+                        )
+                        continue
+
                 except Exception as e:
-                    logger.error(" Failed to decode attachment %s in message %s: %s", attachment_id, msg_id, e)
+                    logger.exception(f"Unexpected error processing attachment: {e}")
                     continue
 
-                # --- Upload to Azure Blob (binary bytes, not Base64) ---
-                try:
-                    logger.info(" Uploading blob: %s", blob_name)
-                    blob_url = upload_pdf_blob(blob_name, file_bytes)
-                    logger.info(" Uploaded successfully: %s", blob_url)
-                except Exception as e:
-                    logger.exception("Blob upload failed for %s (msg=%s): %s", blob_name, msg_id, e)
-                    continue
+        logger.info(f"✔ Finished category={category}")
 
-                # --- Analyze + Store via Azure AI ---
-                try:
-                    logger.info(" Analyzing invoice for %s...", filename)
-                    result = analyze_and_store(
-                        blob_url,
-                        content_b64,
-                        msg_id,
-                        attachment_id,
-                        category=category
-                    )
-
-                    if result:
-                        safe_result = sanitize_for_mongo(result)
-                        processed_docs.append(safe_result.get("_id") or safe_result)
-                        logger.info(" Stored invoice successfully: %s", safe_result.get("_id"))
-                    else:
-                        logger.warning(" No result returned for %s", filename)
-                except Exception as e:
-                    logger.exception("Analysis/storage failed for msg=%s att=%s: %s", msg_id, attachment_id, e)
-                    continue
-
-            except Exception as e:
-                logger.exception("Unexpected error processing attachment in msg=%s: %s", msg_id, e)
-                continue
-
-    logger.info(" Completed processing %d message(s); %d stored document(s)", msg_count, len(processed_docs))
+    logger.info(f"🎉 Completed all inboxes. Total stored documents: {len(processed_docs)}")
     return processed_docs
+
 
 # ---------------------------------------------------------------------
 # Optional: continuous monitor
